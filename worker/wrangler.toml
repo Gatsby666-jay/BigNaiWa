@@ -7,6 +7,15 @@ compatibility_date = "2024-09-23"
 binding = "DNW"
 id = "f3ffe6cefa194d669302185d06b224c7"
 
+# 自定义域名：workers.dev 在国内网络常被 DNS 污染，改绑自有域名保证可达
+[[routes]]
+pattern = "unlock.gatsbyw.cc.cd"
+custom_domain = true
+
 # 非敏感的变量可以放这里；敏感凭证用 secret（见 README）
 [vars]
 SPONSOR_AMOUNT = "6.60"
+# 爱发电下单页（默认 ifdian.net，若跳转到你的主页不对，改这里）
+SPONSOR_PLAN_URL = "https://ifdian.net/order/create"
+# 爱发电「方案/档位」ID：去爱发电后台建一个档位，从下单链接里取 plan_id 填到这里
+SPONSOR_PLAN_ID = "REPLACE_WITH_YOUR_PLAN_ID"

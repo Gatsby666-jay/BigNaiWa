@@ -61,7 +61,12 @@ export default {
 function json(data, status = 200, cors = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors },
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      // 关键：不加这个，Cloudflare 会缓存 GET 响应，导致改了配置仍返回旧结果
+      'Cache-Control': 'no-store, max-age=0',
+      ...cors,
+    },
   });
 }
 
@@ -152,34 +157,32 @@ async function handleStatus(url, env, cors) {
   return json({ paidToday: v === todayStr() }, 200, cors);
 }
 
+/**
+ * 生成爱发电「下单页」链接。
+ *
+ * ⚠️ 重要更正：爱发电开放平台**没有**「创建订单」的 API
+ * （只有 ping / query-order / query-sponsor），所以不能由后端下单。
+ * 但爱发电的下单页支持 URL 参数，其中 custom_order_id 会原样带回 webhook，
+ * 我们借它把玩家 uid 编码进订单（dnw_<uid>），回调时再取回来完成解锁。
+ */
 async function handlePayUrl(url, env, cors) {
   const uid = (url.searchParams.get('uid') || '').trim();
   if (!uid) return json({ error: 'missing uid' }, 400, cors);
-  if (!env.AFDIAN_TOKEN || !env.AFDIAN_USER_ID) {
-    return json({ error: '后端未配置 AFDIAN_TOKEN / AFDIAN_USER_ID' }, 500, cors);
+
+  const planId = env.SPONSOR_PLAN_ID;
+  if (!planId || String(planId).indexOf('REPLACE') === 0) {
+    return json({ error: '后端未配置 SPONSOR_PLAN_ID（爱发电方案/档位 ID）' }, 500, cors);
   }
-  const amount = (env.SPONSOR_AMOUNT || '6.60');
-  const outTradeNo = 'dnw_' + uid;             // 用来在回调里找回 uid
-  const params = {
-    user_id: env.AFDIAN_USER_ID,
-    out_trade_no: outTradeNo,
-    total_amount: String(amount),
-    remark: '合成大奶娃-解锁今日畅玩',
-  };
-  const paramsStr = JSON.stringify(params);
-  const sign = md5Sign(params, env.AFDIAN_TOKEN);
-  const resp = await fetch('https://afdian.com/api/open/order/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'user_id=' + encodeURIComponent(env.AFDIAN_USER_ID) +
-          '&params=' + encodeURIComponent(paramsStr) +
-          '&sign=' + sign,
-  });
-  const data = await resp.json().catch(() => ({}));
-  const urlOut = (data && data.data && data.data.pay_url) ||
-                 (data && data.data && data.data.order && data.data.order.pay_url);
-  if (urlOut) return json({ url: urlOut }, 200, cors);
-  return json({ error: '爱发电下单失败', detail: data }, 502, cors);
+
+  const base = env.SPONSOR_PLAN_URL || 'https://ifdian.net/order/create';
+  const amount = env.SPONSOR_AMOUNT || '6.60';
+
+  const orderUrl = base +
+    '?plan_id=' + encodeURIComponent(planId) +
+    '&product_type=0' +
+    '&custom_order_id=' + encodeURIComponent('dnw_' + uid) +
+    '&custom_price=' + encodeURIComponent(amount);
+  return json({ url: orderUrl }, 200, cors);
 }
 
 async function handleWebhook(request, env, cors) {
@@ -199,8 +202,15 @@ async function handleWebhook(request, env, cors) {
   // 解析订单，找回 uid
   let order = {};
   try { order = typeof params.order === 'string' ? JSON.parse(params.order) : (params.order || {}); } catch (e) { order = {}; }
-  const outTradeNo = order.out_trade_no || '';
-  const uid = outTradeNo.startsWith('dnw_') ? outTradeNo.slice(4) : String(order.remark || '');
+  // 优先取 custom_order_id（下单页带过去的 dnw_<uid>），其次 out_trade_no，最后 remark
+  const customId = String(order.custom_order_id || '');
+  const outTradeNo = String(order.out_trade_no || '');
+  const remark = String(order.remark || '');
+  let uid = '';
+  if (customId.startsWith('dnw_')) uid = customId.slice(4);
+  else if (outTradeNo.startsWith('dnw_')) uid = outTradeNo.slice(4);
+  else if (remark.startsWith('dnw_')) uid = remark.slice(4);
+  else uid = remark;
 
   // 已支付判定：爱发电 order.status === 3 表示已支付/已结算（按文档；如不同改这里）
   const paid = order.status === 3 || order.status === '3' || order.pay_status === 'paid';
