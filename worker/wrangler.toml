@@ -1,11 +1,11 @@
 name = "bignaiwa-unlock"
-main = "worker/index.js"
+main = "index.js"
 compatibility_date = "2024-09-23"
 
-# KV 命名空间：先 `wrangler kv namespace create DNW` 拿到 id 填到下面
-kv_namespaces = [
-  { binding = "DNW", id = "REPLACE_WITH_YOUR_KV_ID" }
-]
+# KV 命名空间（id 已填入：由 `wrangler kv namespace create DNW` 产出）
+[[kv_namespaces]]
+binding = "DNW"
+id = "f3ffe6cefa194d669302185d06b224c7"
 
 # 非敏感的变量可以放这里；敏感凭证用 secret（见 README）
 [vars]
