@@ -486,6 +486,38 @@ body {
 
 .btn.btn-unlock:active { transform: translateY(1px) scale(.99); }
 
+/* ---------------- 解锁码输入框 ---------------- */
+.unlock-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px dashed rgba(20, 184, 106, .5);
+  border-radius: 14px;
+  background: rgba(20, 184, 106, .08);
+}
+.unlock-tip { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: var(--text, #2b2233); }
+.unlock-tip strong { color: #14b86a; }
+.unlock-row { display: flex; gap: 8px; }
+.unlock-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 15px;
+  color: var(--text, #2b2233);
+  background: #fff;
+  border: 1px solid rgba(20, 184, 106, .45);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.unlock-input:focus {
+  border-color: #14b86a;
+  box-shadow: 0 0 0 3px rgba(20, 184, 106, .22);
+}
+.unlock-row .btn-unlock { flex: 0 0 auto; margin-top: 0; width: auto; padding: 10px 20px; }
+.unlock-msg { margin: 8px 0 0; font-size: 13px; min-height: 18px; color: #8a8290; }
+.unlock-msg.ok { color: #14b86a; font-weight: 600; }
+.unlock-msg.err { color: #e35d6a; }
+
 /* 赞助弹窗里的按钮撑满宽度 */
 .sponsor-body .btn { display: block; width: 100%; margin-top: 12px; }
 

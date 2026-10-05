@@ -162,7 +162,15 @@
       <img class="sponsor-qr" src="assets/sponsor-qr.jpg" width="480" height="480"
            alt="微信收款码" loading="lazy" decoding="async">
       <p class="sponsor-hint">微信扫一扫 · 一包辣条 · 全凭心意</p>
-      <button class="btn btn-unlock btn-wide" id="sponsorUnlock" type="button">🎁 我已打赏 · 解锁今日无限畅玩</button>
+      <div class="unlock-box">
+        <p class="unlock-tip">已打赏？输入作者私下给的<strong>解锁码</strong>，今日即可无限畅玩：</p>
+        <div class="unlock-row">
+          <input class="unlock-input" id="sponsorCodeInput" type="text" inputmode="text"
+                 autocomplete="off" spellcheck="false" placeholder="输入解锁码" aria-label="解锁码">
+          <button class="btn btn-unlock" id="sponsorVerifyBtn" type="button">解锁</button>
+        </div>
+        <p class="unlock-msg" id="sponsorCodeMsg" role="status" aria-live="polite"></p>
+      </div>
     </div>
     <footer class="modal-foot">
       <span class="board-note">谢谢每一位投喂的玩家 ❤️</span>

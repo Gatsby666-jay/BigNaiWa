@@ -12,6 +12,12 @@
   const KEY = 'dnw_stamina_v1';
   const DAILY = 1;                 // 每人每天体力点数
 
+  /* 解锁码：纯前端无法验证真实付款，改用「作者私下发的码」做门槛。
+   * 码本身绝不写进页面，只存它的 SHA-256 哈希（加盐），白嫖党看源码也拿不到明文。
+   * 想换码：用 tools/gen_unlock_hash.js 重新生成哈希，替换下面 UNLOCK_HASH 即可。 */
+  const UNLOCK_SALT = 'dnw_sponsor_salt_v1';
+  const UNLOCK_HASH = '03099fe011b60fa215ba5683130b90aca590a861797cfb7abab5e58c5b5361a1';
+
   function todayStr() {
     const d = new Date();
     const p = (n) => String(n).padStart(2, '0');
@@ -79,6 +85,15 @@
 
   function isUnlimited() { return state.unlimited; }
 
+  /* 解锁码校验：把输入加盐后 SHA-256，与页内哈希比对。非安全上下文（如 file://）无 crypto.subtle。 */
+  async function sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.prototype.map.call(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  function verifyCode(input) {
+    return sha256Hex(((input || '').trim()) + UNLOCK_SALT).then((h) => h === UNLOCK_HASH);
+  }
+
   /* 体力不够时：打开赞助弹窗，引导玩家扫码打赏解锁 */
   function blocked() {
     render();
@@ -100,22 +115,39 @@
       labelEl = document.querySelector('#staminaChip .stamina-label');
     }
 
-    /* 2) 赞助弹窗里的「我已打赏」解锁按钮 */
-    const unlockBtn = document.getElementById('sponsorUnlock');
-    if (unlockBtn && !unlockBtn.dataset.bound) {
-      unlockBtn.dataset.bound = '1';
-      unlockBtn.addEventListener('click', function () {
-        unlockToday();
-        const hint = document.querySelector('.sponsor-hint');
-        if (hint) hint.textContent = '🎉 今日已解锁无限畅玩，尽情玩吧！';
-        if (window.DanaiwaSponsor) window.DanaiwaSponsor.close();
-        /* 体力耗尽时（游戏已结束 / 还没开局）解锁后直接开一局 */
-        const dnw = window.__DNW__;
-        if (dnw && dnw.reset &&
-            (!dnw.state || dnw.state.over || (dnw.state.balls && dnw.state.balls.length === 0))) {
-          dnw.reset();
+    /* 2) 赞助弹窗里的「解锁码」输入 + 校验 */
+    const verifyBtn = document.getElementById('sponsorVerifyBtn');
+    const inputEl = document.getElementById('sponsorCodeInput');
+    const msgEl = document.getElementById('sponsorCodeMsg');
+    if (verifyBtn && inputEl && !verifyBtn.dataset.bound) {
+      verifyBtn.dataset.bound = '1';
+      const tryVerify = async function () {
+        const val = inputEl.value;
+        if (!val) { msgEl.textContent = '请先输入解锁码'; msgEl.className = 'unlock-msg err'; return; }
+        if (!crypto || !crypto.subtle) {
+          msgEl.textContent = '请在 https 线上版本里解锁（本地直接打开不支持）';
+          msgEl.className = 'unlock-msg err';
+          return;
         }
-      });
+        const ok = await verifyCode(val);
+        if (ok) {
+          unlockToday();
+          msgEl.textContent = '🎉 今日已解锁无限畅玩！';
+          msgEl.className = 'unlock-msg ok';
+          if (window.DanaiwaSponsor) window.DanaiwaSponsor.close();
+          /* 体力耗尽时（游戏已结束 / 还没开局）解锁后直接开一局 */
+          const dnw = window.__DNW__;
+          if (dnw && dnw.reset &&
+              (!dnw.state || dnw.state.over || (dnw.state.balls && dnw.state.balls.length === 0))) {
+            dnw.reset();
+          }
+        } else {
+          msgEl.textContent = '❌ 解锁码不对，确认下作者给的码～';
+          msgEl.className = 'unlock-msg err';
+        }
+      };
+      verifyBtn.addEventListener('click', tryVerify);
+      inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryVerify(); });
     }
 
     render();
