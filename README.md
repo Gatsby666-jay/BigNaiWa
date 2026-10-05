@@ -5,7 +5,7 @@
 
 ## 🎮 在线玩
 
-**<https://yhsome.github.io/BigNaiWa/>**
+**<https://gatsby666-jay.github.io/BigNaiWa/>**
 
 （GitHub Pages 托管，手机浏览器打开就能玩，也可以「添加到主屏幕」当 App 用。）
 
@@ -73,7 +73,7 @@ for (const b of balls) {
 
 ## 运行
 
-线上直接开 <https://yhsome.github.io/BigNaiWa/>；
+线上直接开 <https://gatsby666-jay.github.io/BigNaiWa/>；
 本地双击 `index.html` 即可（`file://` 协议下也能跑，排行榜同样可用）。
 也可以起个静态服务：
 
