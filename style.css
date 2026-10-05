@@ -496,7 +496,7 @@ body {
 }
 .unlock-tip { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: var(--text, #2b2233); }
 .unlock-tip strong { color: #14b86a; }
-.unlock-row { display: flex; gap: 8px; }
+.unlock-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .unlock-input {
   flex: 1 1 auto;
   min-width: 0;
@@ -513,7 +513,8 @@ body {
   border-color: #14b86a;
   box-shadow: 0 0 0 3px rgba(20, 184, 106, .22);
 }
-.unlock-row .btn-unlock { flex: 0 0 auto; margin-top: 0; width: auto; padding: 10px 20px; }
+.unlock-row .btn { flex: 1 1 auto; margin-top: 0; }
+.unlock-row .btn-unlock { flex: 1 1 auto; margin-top: 0; }
 .unlock-msg { margin: 8px 0 0; font-size: 13px; min-height: 18px; color: #8a8290; }
 .unlock-msg.ok { color: #14b86a; font-weight: 600; }
 .unlock-msg.err { color: #e35d6a; }

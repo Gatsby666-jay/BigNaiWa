@@ -161,15 +161,14 @@
         要是它逗你笑了一下，赏作者一包辣条呗 🌶️</p>
       <img class="sponsor-qr" src="assets/sponsor-qr.jpg" width="480" height="480"
            alt="微信收款码" loading="lazy" decoding="async">
-      <p class="sponsor-hint">微信扫一扫 · 一包辣条 · 全凭心意</p>
+      <p class="sponsor-hint">🟢 微信扫码也能打赏（随心意，不解锁）；想<strong>解锁今日无限畅玩</strong>、杜绝白嫖，请走下方爱发电 ↓</p>
       <div class="unlock-box">
-        <p class="unlock-tip">已打赏？输入作者私下给的<strong>解锁码</strong>，今日即可无限畅玩：</p>
+        <p class="unlock-tip">体力用完想继续玩？<strong>真实打赏后</strong>今日即可无限畅玩（由后端校验，无法白嫖）：</p>
         <div class="unlock-row">
-          <input class="unlock-input" id="sponsorCodeInput" type="text" inputmode="text"
-                 autocomplete="off" spellcheck="false" placeholder="输入解锁码" aria-label="解锁码">
-          <button class="btn btn-unlock" id="sponsorVerifyBtn" type="button">解锁</button>
+          <button class="btn btn-unlock" id="sponsorPayBtn" type="button">去打赏（爱发电）</button>
+          <button class="btn" id="sponsorRefreshBtn" type="button">我已完成支付</button>
         </div>
-        <p class="unlock-msg" id="sponsorCodeMsg" role="status" aria-live="polite"></p>
+        <p class="unlock-msg" id="sponsorPayMsg" role="status" aria-live="polite"></p>
       </div>
     </div>
     <footer class="modal-foot">
@@ -183,7 +182,8 @@
 <script src="assets/fruits/parts.js"></script>
 <!-- 极模糊占位图（内联 data URL，由 tools/make_blur.py 产出）：贴图没到位时先画它 -->
 <script src="assets/fruits/blur.js"></script>
-<!-- 体力值系统（每日 1 点，打赏解锁无限） -->
+<!-- 体力值系统（每日 1 点，后端校验打赏解锁无限） -->
+<script src="config.js"></script>
 <script src="stamina.js"></script>
 <script src="game.js"></script>
 <!-- 排行榜 -->

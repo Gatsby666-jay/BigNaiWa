@@ -85,24 +85,28 @@ python -m http.server 8080
 部署：仓库打开 **Settings → Pages → Source = Deploy from a branch → main / (root)** 即可，
 根目录已经放了 `.nojekyll`，静态文件原样发布。
 
-## 体力值（每日限玩）
+## 体力值（每日限玩 + 后端校验打赏）
 
-游戏改成了**体力值制**，鼓励「打赏解锁无限畅玩」：
+游戏是**体力值制**，且「是否真打赏过」由后端确认，没法在前端点个按钮就白嫖：
 
 - 每人**每天 1 点体力**，每开一局（含首屏自动开局、结算页「再来一局」、面板「重开」、`R` 键）扣 1 点。
-- 体力用完当天，再点开局会直接弹出**赞助作者**弹窗（微信收款码），无法继续游戏。
-- 弹窗里输入**解锁码**才能解锁「今日无限畅玩」：扫完码打赏后，作者会把解锁码私下发给你；填对即把当天标记为无限畅玩，之后随便玩。
-- 体力数据存在浏览器 `localStorage`（key `dnw_stamina_v1`），按本地日期每天 0 点自动重置，**换浏览器 / 清缓存会重新记 1 点**。
+- 体力用完当天，再点开局会直接弹出**赞助作者**弹窗，必须**真实打赏**才能解锁「今日无限畅玩」。
+- 弹窗里点「去打赏（爱发电）」→ 后端生成带本机匿名ID的支付链接并新开标签页 → 在爱发电付完 → 点「我已完成支付」→ 前端问后端 `/api/status` 确认，**确认后才解锁**。
+- 后端用**爱发电 webhook 签名**校验回调真伪，没有 webhook token 谁也伪造不了「已付款」。
+- 体力/解锁状态存浏览器 `localStorage`（key `dnw_stamina_v1`，匿名设备ID 在 `dnw_uid`），按本地日期每天 0 点重置，**换浏览器 / 清缓存会重新记 1 点**。
 
-> **为什么用「解锁码」而不是「我已打赏」一键解锁？**
-> 纯静态站点（GitHub Pages）没有后端、没有服务器密钥，页面无从知道玩家到底扫没扫码、付没付款——原来那个一键按钮谁都能点。
-> 改成解锁码后：**明文码绝不进仓库**，页面里只存它的 SHA-256 哈希（加盐），白嫖党看源码也拿不到码，只能找付款人要。
-> 这仍不是 100% 防作弊（会看源码的人理论上能暴力试码），但已挡住随手白嫖。要彻底杜绝需接微信支付回调 + 后端。
+> **为什么现在能真防白嫖了？**
+> 之前的解锁码机制只是「抬高门槛」（码不进源码，但会看源码的人仍能暴力试）。这次加了后端：
+> 解锁的唯一途径是**爱发电真实支付 → 带签名的回调写进 Cloudflare KV**，前端开局前只问后端「我这设备今天付了没」。
+> 白嫖党既拿不到 webhook 签名，也没有一键按钮可点，只能真付。仍有两个理论边角：
+> 1) 付款人把自己的匿名ID（`dnw_uid`）告诉别人 → 别人改 localStorage 蹭玩（需懂开发者工具，非「随手白嫖」）；
+> 2) 想彻底绑定身份需登录体系，本游戏刻意保持无账号。对休闲小游戏足够。
 
-**换解锁码**：`node tools/gen_unlock_hash.js "<新码>"`，把输出的 `UNLOCK_HASH` 粘进 `stamina.js` 顶部的 `UNLOCK_HASH` 即可（默认码 `naiwa2026`，salt 与脚本里保持一致）。
+**后端部署**：见 [`worker/README.md`](worker/README.md)（Cloudflare Workers + KV，免费）。部署后把 Worker 地址填进前端 `config.js` 的 `API_BASE`。
+`config.js` 的 `API_BASE` 留空时：体力系统照常可玩（每天 1 点），但不校验打赏、也无法解锁无限畅玩。
 
-实现在 `stamina.js`：开局时 `game.js` 的 `reset()` 先调 `DanaiwaStamina.canStart()` / `consume()`，
-用完则调 `blocked()` 打开赞助弹窗；弹窗里输入码 → `verifyCode()` 比对哈希 → 通过则 `unlockToday()`。
+实现：`stamina.js` 给每台设备生成匿名 `uid`；`game.js` 的 `reset()` 调 `canStart()` / `consume()` / `blocked()`；
+打赏流程在弹窗里「去打赏」(`/api/pay-url`) 与「我已完成支付」(`refreshPaid()` → `/api/status`) 完成。
 
 ## 文件
 
@@ -113,7 +117,9 @@ python -m http.server 8080
 | `game.js` | 游戏逻辑 + 自研物理 + Canvas 渲染 + WebAudio 音效 |
 | `leaderboard.min.js` | 在线排行榜的构建产物（TinyWebDB 接口 + 弹窗渲染），页面直接引用它 |
 | `sponsor.js` | 结算页「赞助作者」弹窗（展示微信收款码），纯静态、无网络请求 |
-| `stamina.js` | 体力值系统：每日 1 点、按天重置、开局扣减、打赏解锁今日无限畅玩（localStorage） |
+| `stamina.js` | 体力值系统：每日 1 点、按天重置、开局扣减；打赏解锁改由后端 `/api/status` 校验 |
+| `config.js` | 前端全局配置：`API_BASE`（解锁后端地址），部署 Worker 后填入 |
+| `worker/` | 解锁后端（Cloudflare Workers + KV）：`/api/status`、`/api/pay-url`、爱发电 `/api/afdian/webhook` 回调，详见 `worker/README.md` |
 | `assets/fruits/` | 水果贴图：`*.png` 是 512×512 的源图，页面实际加载的是 `*.webp`；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
 | `tools/normalize_assets.py` | 素材统一脚本：抠底、去噪、统一画布、烤暗边 |
 | `tools/optimize_sprites.py` | 把源图压成 WebP 并裁到每级实际需要的尺寸（1.45 MB → 0.19 MB） |

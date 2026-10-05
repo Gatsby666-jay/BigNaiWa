@@ -1,0 +1,12 @@
+name = "bignaiwa-unlock"
+main = "worker/index.js"
+compatibility_date = "2024-09-23"
+
+# KV 命名空间：先 `wrangler kv namespace create DNW` 拿到 id 填到下面
+kv_namespaces = [
+  { binding = "DNW", id = "REPLACE_WITH_YOUR_KV_ID" }
+]
+
+# 非敏感的变量可以放这里；敏感凭证用 secret（见 README）
+[vars]
+SPONSOR_AMOUNT = "6.60"
