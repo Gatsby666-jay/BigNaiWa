@@ -85,6 +85,19 @@ python -m http.server 8080
 部署：仓库打开 **Settings → Pages → Source = Deploy from a branch → main / (root)** 即可，
 根目录已经放了 `.nojekyll`，静态文件原样发布。
 
+## 体力值（每日限玩）
+
+游戏改成了**体力值制**，鼓励「打赏解锁无限畅玩」：
+
+- 每人**每天 1 点体力**，每开一局（含首屏自动开局、结算页「再来一局」、面板「重开」、`R` 键）扣 1 点。
+- 体力用完当天，再点开局会直接弹出**赞助作者**弹窗（微信收款码），无法继续游戏。
+- 在赞助弹窗里点 **🎁 我已打赏 · 解锁今日无限畅玩**，即把当天剩余时间标记为**无限畅玩**，之后随便玩。
+- 体力数据存在浏览器 `localStorage`（key `dnw_stamina_v1`），按本地日期每天 0 点自动重置，**换浏览器 / 清缓存会重新记 1 点**。
+- 纯前端、无后端、无账号；「打赏解锁」是凭玩家自觉的信任机制（扫码支付后手动点一下），并不校验真实付款。
+
+实现在 `stamina.js`：开局时 `game.js` 的 `reset()` 先调 `DanaiwaStamina.canStart()` / `consume()`，
+用完则调 `blocked()` 打开赞助弹窗；赞助弹窗里的解锁按钮调 `unlockToday()`。
+
 ## 文件
 
 | 文件 | 说明 |
@@ -94,6 +107,7 @@ python -m http.server 8080
 | `game.js` | 游戏逻辑 + 自研物理 + Canvas 渲染 + WebAudio 音效 |
 | `leaderboard.min.js` | 在线排行榜的构建产物（TinyWebDB 接口 + 弹窗渲染），页面直接引用它 |
 | `sponsor.js` | 结算页「赞助作者」弹窗（展示微信收款码），纯静态、无网络请求 |
+| `stamina.js` | 体力值系统：每日 1 点、按天重置、开局扣减、打赏解锁今日无限畅玩（localStorage） |
 | `assets/fruits/` | 水果贴图：`*.png` 是 512×512 的源图，页面实际加载的是 `*.webp`；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
 | `tools/normalize_assets.py` | 素材统一脚本：抠底、去噪、统一画布、烤暗边 |
 | `tools/optimize_sprites.py` | 把源图压成 WebP 并裁到每级实际需要的尺寸（1.45 MB → 0.19 MB） |

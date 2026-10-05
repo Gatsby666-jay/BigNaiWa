@@ -113,12 +113,16 @@
       <button class="btn btn-primary" id="resetBtn" type="button" title="重新开始">
         <span class="ico">↻</span><span class="lbl">重开</span>
       </button>
+      <button class="btn btn-sponsor" id="sponsorBtnHome" type="button" title="赞助作者">
+        <span class="ico">🌶️</span><span class="lbl">赞助作者</span>
+      </button>
     </div>
 
     <p class="tips">
       鼠标：移动瞄准、点击投放；触屏：拖动瞄准、松手投放。<br>
       ← → 微调位置，空格投放，R 重开。<br>
-      每 <strong>2000 分</strong>攒一枚<strong>复活币</strong>，只在本局有效。
+      每 <strong>2000 分</strong>攒一枚<strong>复活币</strong>，只在本局有效。<br>
+      每天 <strong>1 点体力</strong>，开一局扣 1 点；体力用完可<strong>打赏作者</strong>解锁今日无限畅玩。
     </p>
 
   </aside>
@@ -158,6 +162,7 @@
       <img class="sponsor-qr" src="assets/sponsor-qr.jpg" width="480" height="480"
            alt="微信收款码" loading="lazy" decoding="async">
       <p class="sponsor-hint">微信扫一扫 · 一包辣条 · 全凭心意</p>
+      <button class="btn btn-unlock btn-wide" id="sponsorUnlock" type="button">🎁 我已打赏 · 解锁今日无限畅玩</button>
     </div>
     <footer class="modal-foot">
       <span class="board-note">谢谢每一位投喂的玩家 ❤️</span>
@@ -170,6 +175,8 @@
 <script src="assets/fruits/parts.js"></script>
 <!-- 极模糊占位图（内联 data URL，由 tools/make_blur.py 产出）：贴图没到位时先画它 -->
 <script src="assets/fruits/blur.js"></script>
+<!-- 体力值系统（每日 1 点，打赏解锁无限） -->
+<script src="stamina.js"></script>
 <script src="game.js"></script>
 <!-- 排行榜 -->
 <script src="leaderboard.min.js"></script>

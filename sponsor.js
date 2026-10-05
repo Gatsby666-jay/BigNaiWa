@@ -23,8 +23,9 @@
   }
 
   function bind() {
-    const btn = $('sponsorBtn');
-    if (btn) btn.addEventListener('click', open);
+    /* 所有带 .btn-sponsor 的按钮（结算页 + 侧边面板常驻入口）都能打开弹窗 */
+    const btns = document.querySelectorAll('.btn-sponsor');
+    btns.forEach((btn) => btn.addEventListener('click', open));
 
     const x = $('sponsorClose');
     if (x) x.addEventListener('click', close);

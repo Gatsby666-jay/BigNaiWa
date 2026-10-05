@@ -775,6 +775,15 @@
   }
 
   function reset() {
+    /* —— 体力值校验：每天 1 点，用完需打赏解锁今日无限畅玩 —— */
+    if (window.DanaiwaStamina) {
+      if (!window.DanaiwaStamina.canStart()) {
+        window.DanaiwaStamina.blocked();   // 体力已用完：弹赞助码，提示打赏
+        return;
+      }
+      window.DanaiwaStamina.consume();      // 扣 1 点体力（已解锁则不扣）
+    }
+
     state.balls.length = 0;
     state.particles.length = 0;
     state.floats.length = 0;

@@ -304,6 +304,24 @@ body {
 
 .stat-best { color: #e79a1f; }
 
+/* 体力条：放在「分数 / 最高分」下方，样式与 .stat 卡片一致 */
+.stamina-chip {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 4px 14px rgba(140, 96, 56, .10);
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: #5a3200;
+}
+
+.stamina-chip .stamina-label {
+  font-variant-numeric: tabular-nums;
+}
+
 /* 复活币：浮在棋盘左上角的小胶囊。
    刻意不放进 .stats —— 手机上面板是横向 flex，多一个卡片会把分数卡挤到
    52px 宽还折行（实测面板从 66px 涨到 102px，整个版式被顶开）。 */
@@ -452,6 +470,24 @@ body {
   border-color: transparent;
   background: linear-gradient(135deg, #ff8a5b, var(--brand) 55%, var(--brand-dark));
 }
+
+/* 赞助弹窗里的「我已打赏 · 解锁今日无限畅玩」按钮 */
+.btn.btn-unlock {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #34d27a, #14b86a 60%, #0e9f5a);
+  box-shadow: 0 8px 22px rgba(20, 184, 106, .42), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+
+.btn.btn-unlock:hover {
+  transform: translateY(-2px) scale(1.012);
+  box-shadow: 0 12px 30px rgba(20, 184, 106, .52), inset 0 1px 0 rgba(255, 255, 255, .55);
+}
+
+.btn.btn-unlock:active { transform: translateY(1px) scale(.99); }
+
+/* 赞助弹窗里的按钮撑满宽度 */
+.sponsor-body .btn { display: block; width: 100%; margin-top: 12px; }
 
 /* ---------------- 结束弹窗里的结算区 ---------------- */
 
