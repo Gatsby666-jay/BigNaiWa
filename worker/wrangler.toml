@@ -15,7 +15,7 @@ custom_domain = true
 # 非敏感的变量可以放这里；敏感凭证用 secret（见 README）
 [vars]
 SPONSOR_AMOUNT = "6.60"
-# 爱发电下单页（默认 ifdian.net，若跳转到你的主页不对，改这里）
-SPONSOR_PLAN_URL = "https://ifdian.net/order/create"
+# 爱发电下单页（官方主域名 afdian.com，国内比老域名 ifdian.net 更稳）
+SPONSOR_PLAN_URL = "https://afdian.com/order/create"
 # 爱发电「方案/档位」ID：去爱发电后台建一个档位，从下单链接里取 plan_id 填到这里
 SPONSOR_PLAN_ID = "3123b2c4c17511f190565254001e7c00"

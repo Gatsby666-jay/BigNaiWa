@@ -174,12 +174,11 @@ async function handlePayUrl(url, env, cors) {
     return json({ error: '后端未配置 SPONSOR_PLAN_ID（爱发电方案/档位 ID）' }, 500, cors);
   }
 
-  const base = env.SPONSOR_PLAN_URL || 'https://ifdian.net/order/create';
+  const base = env.SPONSOR_PLAN_URL || 'https://afdian.com/order/create';
   const amount = env.SPONSOR_AMOUNT || '6.60';
 
   const orderUrl = base +
     '?plan_id=' + encodeURIComponent(planId) +
-    '&product_type=0' +
     '&custom_order_id=' + encodeURIComponent('dnw_' + uid) +
     '&custom_price=' + encodeURIComponent(amount);
   return json({ url: orderUrl }, 200, cors);
