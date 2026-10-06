@@ -214,6 +214,11 @@
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
     view.dpr = dpr;
     view.scale = (rect.width * dpr) / W;
+    /* 关键：改 canvas 尺寸会把 2D 上下文状态重置为默认（含平滑质量）。
+       不重设的话，PNG 在高分屏放大时会被浏览器用 low 质量插值 → 发虚。 */
+    ctx.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+    refreshPreviews();   // 预览图同步按 dpr 重绘，手机端才不发虚
   }
 
   /* ---------------------------------------------------------
@@ -1115,10 +1120,26 @@
   }
 
   /* 面板中的“下一个” */
+  /* 让预览 canvas（#next / #chain）按「CSS 显示尺寸 × dpr」设置后备分辨率，
+     并把上下文缩放到逻辑像素。这样高分屏（DPR≥2/3）上预览图才不发虚，
+     且绘制时直接用 CSS 像素坐标即可。 */
+  function fitPreview(cv, c) {
+    const rect = cv.getBoundingClientRect();
+    const cssW = rect.width  || cv.clientWidth  || 1;
+    const cssH = rect.height || cv.clientHeight || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const bw = Math.max(1, Math.round(cssW * dpr));
+    const bh = Math.max(1, Math.round(cssH * dpr));
+    if (cv.width !== bw)  cv.width  = bw;
+    if (cv.height !== bh) cv.height = bh;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);   // 之后所有绘制用 CSS 像素坐标
+    c.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in c) c.imageSmoothingQuality = 'high';
+    return { w: cssW, h: cssH };
+  }
+
   function drawNext() {
-    const w = nextCanvas.width;
-    const h = nextCanvas.height;
-    nextCtx.setTransform(1, 0, 0, 1, 0, 0);
+    const { w, h } = fitPreview(nextCanvas, nextCtx);
     nextCtx.clearRect(0, 0, w, h);
     const tier = state.next;
     const r = FRUITS[tier].r;
@@ -1128,9 +1149,7 @@
 
   /* 面板中的“合成表” */
   function drawChain() {
-    const cw = chainCanvas.width;
-    const ch = chainCanvas.height;
-    chainCtx.setTransform(1, 0, 0, 1, 0, 0);
+    const { w: cw, h: ch } = fitPreview(chainCanvas, chainCtx);
     chainCtx.clearRect(0, 0, cw, ch);
 
     const slot = cw / FRUITS.length;

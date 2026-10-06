@@ -789,7 +789,7 @@ body {
    ============================================================ */
 
 @media (max-width: 860px) {
-  :root { --topbar: 68px; }   /* 顶部信息条 + 间隙的大致占高 */
+  :root { --topbar: 136px; }   /* 顶部信息条（分数行 + 按钮行）占高，略留余量防重叠 */
 
   body {
     padding: calc(8px + var(--safe-t)) calc(8px + var(--safe-r))
@@ -821,14 +821,15 @@ body {
     border-radius: 20px;
   }
 
-  /* ---- 顶部信息条 ---- */
+  /* ---- 顶部信息条：上下两排（分数行 + 按钮行），互不挤占，
+         避免小屏把「分数/最高分」挤成一条、数字溢出重叠 ---- */
   .panel {
-    flex-direction: row;
+    flex-direction: column;
     align-items: stretch;
     gap: 8px;
     width: 100%;
     max-width: calc(96vw * 700 / 420);
-    padding: 8px 10px;
+    padding: 10px 12px;
     border-radius: 18px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -840,42 +841,44 @@ body {
   .tips { display: none; }
 
   .stats {
-    flex: 1 1 auto;
-    display: flex;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
     min-width: 0;
   }
 
   .stat {
-    flex: 1 1 0;
-    min-width: 0;
-    padding: 6px 10px;
+    padding: 8px 10px;
     border-radius: 12px;
     background: rgba(255, 255, 255, .9);
     box-shadow: 0 2px 8px rgba(140, 96, 56, .12);
   }
 
-  .stat-label { font-size: 10px; letter-spacing: .08em; }
+  .stat-label { font-size: 11px; letter-spacing: .08em; }
 
   .stat-value {
     margin-top: 0;
-    font-size: 20px;
+    font-size: 22px;
     line-height: 1.15;
   }
 
   .actions {
-    flex: 0 0 auto;
-    display: flex;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: 100%;
   }
 
-  /* 触摸目标够大，别让人点不中 */
+  /* 触摸目标够大；文字允许换行，窄屏也不被挤掉 */
   .btn {
-    min-height: 46px;
-    padding: 0 12px;
-    font-size: 14px;
+    min-height: 48px;
+    padding: 6px 8px;
+    font-size: 13px;
     border-radius: 13px;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.15;
+    text-align: center;
   }
 
   /* 手机上「排行榜 / 音效」只留图标，把横向空间让给分数 */
@@ -883,9 +886,8 @@ body {
   #soundBtn .lbl { display: none; }
 
   #boardBtn, #soundBtn {
-    min-width: 46px;
-    padding: 0 10px;
-    font-size: 17px;
+    font-size: 18px;
+    padding: 6px 4px;
   }
 
   #boardBtn .ico, #soundBtn .ico { margin-right: 0; }
@@ -938,9 +940,9 @@ body {
     padding: 10px;
   }
 
-  .stats { flex-direction: column; flex: 0 0 auto; }
+  .stats { grid-template-columns: 1fr; flex: 0 0 auto; }
 
-  .actions { flex-direction: column; }
+  .actions { grid-template-columns: 1fr; }
 
   .stage {
     height: calc(var(--vh) - 16px - var(--safe-t) - var(--safe-b));
