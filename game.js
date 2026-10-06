@@ -1,5 +1,5 @@
 /* ============================================================
- *  合成大奶娃 · Suika Game
+ *  合成大奶long · Suika Game
  *  纯原生 HTML + CSS + JavaScript，无任何依赖。
  *
  *  物理：PBD（位置约束求解）—— 3 个子步 × 6 次迭代，
@@ -35,6 +35,11 @@
   const FREEZE_MS = 130;     // 清场时的定格，让这一下有重量
   const REVIVE_STEP = 2000;  // 每累计多少分，发一枚复活币
   const MERGE_PAD = 0.8;     // 合成判定的接触容差（px）
+
+  /* 「重开」门槛：本局得分达到这么多分才允许重开。
+     低于门槛时按钮置灰禁用并提示，避免没玩出什么名堂就无限重开。 */
+  const RESTART_MIN_SCORE = 4000;
+  const RESTART_HINT = '达到 ' + RESTART_MIN_SCORE + ' 分才能重开';
 
   /* —— Q 弹手感 —— */
   const RESTITUTION      = 0.38;  // 球与球之间的弹性
@@ -633,6 +638,41 @@
     Sound.merge(6);
   }
 
+  /* 「再来一局」的目标：滚到页面里的「赞助作者」区域并把它高亮/打开。
+     先滚动定位（让用户看到自己被带到了哪儿），再唤起赞助弹窗，
+     这样即使弹窗盖满全屏，语义上也确实是「跳到赞助区」。 */
+  function gotoSponsor() {
+    const home = document.getElementById('sponsorBtnHome');
+    const area = document.querySelector('.sponsor-body') || home;
+    try {
+      if (area && area.scrollIntoView) {
+        area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (home && home.scrollIntoView) {
+        home.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (e) { /* 老浏览器不支持 smooth，忽略 */ }
+
+    if (home && home.classList) {
+      home.classList.add('pulse');
+      setTimeout(() => home.classList.remove('pulse'), 1600);
+    }
+    if (window.DanaiwaSponsor && window.DanaiwaSponsor.open) {
+      window.DanaiwaSponsor.open();
+    }
+  }
+
+  /* 「重开」按钮的门槛状态：分数 < 4000 时置灰禁用并给出提示。
+     得分每次变化（加分、复活扣减、结算）都要同步一次。 */
+  function syncRestartBtn() {
+    if (!resetBtn) return;
+    const ok = state.score >= RESTART_MIN_SCORE;
+    resetBtn.disabled = !ok;
+    resetBtn.setAttribute('aria-disabled', String(!ok));
+    resetBtn.title = ok ? '重新开始' : RESTART_HINT;
+    const lbl = resetBtn.querySelector('.lbl');
+    if (lbl) lbl.textContent = ok ? '重开' : RESTART_HINT;
+  }
+
   function addScore(n, x, y, text) {
     state.score += n;
     if (state.score > state.best) {
@@ -642,6 +682,7 @@
     }
     scoreEl.textContent = state.score;
     bump(scoreEl);
+    syncRestartBtn();
     if (x !== undefined) {
       state.floats.push({ x, y, text: text || ('+' + n), life: 1 });
     }
@@ -820,6 +861,7 @@
     paintRevives(false);
     scoreEl.textContent = '0';
     bestEl.textContent = state.best;
+    syncRestartBtn();      // 新一局分数归零 → 重开按钮回到禁用态
     drawNext();
     Sound.ensure();
   }
@@ -1325,8 +1367,23 @@
     if (!Sound.muted) Sound.merge(1);
   });
 
-  resetBtn.addEventListener('click', reset);
-  restartBtn.addEventListener('click', reset);
+  /* 「重开」：只有本局得分 ≥ 4000 才允许重开。
+     disabled 时浏览器不会派发 click，这里再判一次是为了兜住
+     「分数被复活/结算改回去」这类边界，也方便将来改成非禁用式提示。 */
+  resetBtn.addEventListener('click', () => {
+    if (state.score < RESTART_MIN_SCORE) {
+      if (window.console) console.info('[danaiwa] ' + RESTART_HINT + '（当前 ' + state.score + ' 分）');
+      syncRestartBtn();
+      return;
+    }
+    reset();
+  });
+
+  /* 「再来一局」：不再直接开新局，而是滚动/跳转到「赞助作者」区域。 */
+  restartBtn.addEventListener('click', () => {
+    if (overlayEl) overlayEl.classList.remove('show');
+    gotoSponsor();
+  });
 
   /* ---------------------------------------------------------
    *  素材加载
@@ -1425,6 +1482,6 @@
   /* 调试句柄（控制台可用）：__DNW__.state / .reset() / .drop() / .FRUITS / .render() */
   window.__DNW__ = { state, reset, revive, settle, gameOver, tryDrop, stepPhysics, update, FRUITS,
                      render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore,
-                     MAX_BONUS, REVIVE_STEP,
+                     MAX_BONUS, REVIVE_STEP, RESTART_MIN_SCORE, gotoSponsor, syncRestartBtn,
                      blurReady: () => !!blurImg };
 })();

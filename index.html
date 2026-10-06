@@ -7,11 +7,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="合成大奶娃">
-<meta name="description" content="合成大奶娃 · 纯前端小游戏：拖动瞄准、松手投放，相同的撞在一起合成更大的一只。">
+<meta name="apple-mobile-web-app-title" content="合成大奶long">
+<meta name="description" content="合成大奶long · 纯前端小游戏：拖动瞄准、松手投放，相同的撞在一起合成更大的一只。">
 <!-- ↓ Monetag 站点验证：把后台给的 meta 标签粘在下面这一行 ↓ -->
 
-<title>合成大奶娃</title>
+<title>合成大奶long</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
 
   <!-- ===== 游戏区 ===== -->
   <section class="stage" id="stage">
-    <canvas id="game" aria-label="合成大奶娃游戏区域"></canvas>
+    <canvas id="game" aria-label="合成大奶long游戏区域"></canvas>
 
     <!-- 复活币：浮在棋盘左上角。
          刻意不放进顶部信息条 —— 手机上面板是横向 flex，
@@ -64,7 +64,7 @@
           <div class="dialog-actions">
             <button class="btn" id="boardBtn2" type="button">🏆 排行榜</button>
             <button class="btn btn-primary" id="restartBtn" type="button">再来一局</button>
-            <button class="btn btn-sponsor btn-wide" id="sponsorBtn" type="button">🌶️ 可以赏作者一包辣条嘛</button>
+            <button class="btn btn-sponsor btn-wide" id="sponsorBtn" type="button">🌶️ 可以赏作者一杯奶茶嘛</button>
           </div>
           <p class="dialog-hint">按 R 键也可重新开始</p>
         </div>
@@ -77,7 +77,7 @@
   <aside class="panel">
 
     <header class="panel-head">
-      <h1>合成大奶娃</h1>
+      <h1>合成大奶long</h1>
       <p class="subtitle">相同的撞在一起，越合越大</p>
     </header>
 
@@ -153,14 +153,25 @@
 <div class="modal" id="sponsorModal" aria-hidden="true" role="dialog" aria-label="赞助作者">
   <div class="modal-card">
     <header class="modal-head">
-      <h2>🌶️ 请作者吃包辣条</h2>
+      <h2>🌶️ 请作者喝杯奶茶</h2>
       <button class="icon-btn" id="sponsorClose" type="button" aria-label="关闭">✕</button>
     </header>
     <div class="sponsor-body">
       <p class="sponsor-note">这游戏完全免费，也没有任何广告。<br>
-        要是它逗你笑了一下，赏作者一包辣条呗 🌶️</p>
-      <img class="sponsor-qr" src="assets/sponsor-qr.jpg" width="480" height="480"
-           alt="微信收款码" loading="lazy" decoding="async">
+        要是它逗你笑了一下，赏作者一杯奶茶呗 🌶️</p>
+      <!-- 两个收款码并排：grid 自适应，窄屏自动堆叠不横向溢出 -->
+      <div class="qr-row">
+        <figure class="qr-item">
+          <img class="sponsor-qr" src="assets/sponsor-qr.jpg" width="480" height="818"
+               alt="微信收款码" loading="lazy" decoding="async">
+          <figcaption class="qr-cap">微信扫码打赏</figcaption>
+        </figure>
+        <figure class="qr-item">
+          <img class="sponsor-qr" src="assets/sponsor-qr2.jpg" width="573" height="580"
+               alt="微信收款码" loading="lazy" decoding="async">
+          <figcaption class="qr-cap">微信扫码打赏</figcaption>
+        </figure>
+      </div>
       <p class="sponsor-hint">🟢 微信扫码也能打赏（随心意，不解锁）；想<strong>解锁今日无限畅玩</strong>、杜绝白嫖，请走下方爱发电 ↓</p>
       <div class="unlock-box">
         <p class="unlock-tip">体力用完想继续玩？<strong>真实打赏后</strong>今日即可无限畅玩（由后端校验，无法白嫖）：</p>
