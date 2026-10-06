@@ -20,8 +20,11 @@
  *    POST /api/afdian/webhook        -> 爱发电回调（校验签名 + 写 KV）
  *    GET  /api/mock-paid?uid=xxx&secret=...  -> 仅 MOCK_SECRET 存在时可用
  *
- *  ⚠️ 爱发电的字段名/签名算法按其开放平台最新文档为准；本文件里的 sign 计算
- *     已按文档实现，若哪天对不上，改 md5Sign / md5Webhook / handleWebhook 三处即可。
+ *  ⚠️ 爱发电 Webhook 签名（2025-07 起）：
+ *     - sign_str = order.out_trade_no + order.user_id + order.plan_id + order.total_amount
+ *     - sign     = 爱发电用「官方私钥」做的 RSA-SHA256 签名（base64）
+ *     - 我们用爱发电公开的公钥做 verify（见 AFDIAN_PUBLIC_KEY）。
+ *     官方要求开发者响应必须含 {"ec":200,"em":"ok"}，否则平台认为回调失败。
  * ============================================================ */
 
 export default {
@@ -45,7 +48,8 @@ export default {
       if (url.pathname === '/api/pay-url' && request.method === 'GET') {
         return await handlePayUrl(url, env, cors);
       }
-      if (url.pathname === '/api/afdian/webhook' && request.method === 'POST') {
+      // 爱发电保存回调/验证时可能发 POST（也可能 GET 探活），统一交给 handleWebhook
+      if (url.pathname === '/api/afdian/webhook') {
         return await handleWebhook(request, env, cors);
       }
       if (url.pathname === '/api/mock-paid' && request.method === 'GET') {
@@ -70,83 +74,78 @@ function json(data, status = 200, cors = {}) {
   });
 }
 
+// 爱发电要求的成功响应结构：只要返回 ec:200，平台即认为回调成功
+function webhookOk(cors = {}) {
+  return new Response(JSON.stringify({ ec: 200, em: 'ok' }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store, max-age=0',
+      ...cors,
+    },
+  });
+}
+
 function todayStr() {
   const d = new Date();
   const p = (n) => String(n).padStart(2, '0');
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 
-/* ---------- 纯 JS MD5（Cloudflare Web Crypto 不含 md5，故自带） ---------- */
-function md5hex(str) {
-  function rotateLeft(n, s) { return (n << s) | (n >>> (32 - s)); }
-  function add(x, y) {
-    const l = (x & 0xffff) + (y & 0xffff);
-    const h = (x >> 16) + (y >> 16) + (l >> 16);
-    return (h << 16) | (l & 0xffff);
-  }
-  function cmn(q, a, b, x, s, t) { return add(rotateLeft(add(add(a, q), add(x, t)), s), b); }
-  function ff(a, b, c, d, x, s, t) { return cmn((b & c) | (~b & d), a, b, x, s, t); }
-  function gg(a, b, c, d, x, s, t) { return cmn((b & d) | (c & ~d), a, b, x, s, t); }
-  function hh(a, b, c, d, x, s, t) { return cmn(b ^ c ^ d, a, b, x, s, t); }
-  function ii(a, b, c, d, x, s, t) { return cmn(c ^ (b | ~d), a, b, x, s, t); }
+/* ---------- 爱发电 Webhook 公钥（RSA-SHA256 验签用，官方公开） ---------- */
+const AFDIAN_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwwdaCg1Bt+UKZKs0R54y
+lYnuANma49IpgoOwNmk3a0rhg/PQuhUJ0EOZSowIC44l0K3+fqGns3Ygi4AfmEfS
+4EKbdk1ahSxu7Zkp2rHMt+R9GarQFQkwSS/5x1dYiHNVMiR8oIXDgjmvxuNes2Cr
+8fw9dEF0xNBKdkKgG2qAawcN1nZrdyaKWtPVT9m2Hl0ddOO9thZmVLFOb9NVzgYf
+jEgI+KWX6aY19Ka/ghv/L4t1IXmz9pctablN5S0CRWpJW3Cn0k6zSXgjVdKm4uN7
+jRlgSRaf/Ind46vMCm3N2sgwxu/g3bnooW+db0iLo13zzuvyn727Q3UDQ0MmZcEW
+MQIDAQAB
+-----END PUBLIC KEY-----`;
 
-  const utf8 = unescape(encodeURIComponent(str));
-  const n = utf8.length;
-  const words = new Array(((n + 8) >> 6) + 2);
-  for (let i = 0; i < n; i++) words[i >> 2] |= (utf8.charCodeAt(i) & 0xff) << ((i % 4) * 8);
-  words[n >> 2] |= 0x80 << ((n % 4) * 8);
-  words[((n + 8) >> 6) * 2] = n * 8;
-
-  let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
-  const k = [
-    0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
-    0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
-    0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
-    0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
-    0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
-    0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
-    0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
-    0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
-  ];
-  const s = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21];
-  for (let i = 0; i < words.length; i += 16) {
-    const oa = a, ob = b, oc = c, od = d;
-    a = ff(a, b, c, d, words[i + 0], s[0], k[0]); d = ff(d, a, b, c, words[i + 1], s[1], k[1]); c = ff(c, d, a, b, words[i + 2], s[2], k[2]); b = ff(b, c, d, a, words[i + 3], s[3], k[3]);
-    a = ff(a, b, c, d, words[i + 4], s[4], k[4]); d = ff(d, a, b, c, words[i + 5], s[5], k[5]); c = ff(c, d, a, b, words[i + 6], s[6], k[6]); b = ff(b, c, d, a, words[i + 7], s[7], k[7]);
-    a = ff(a, b, c, d, words[i + 8], s[8], k[8]); d = ff(d, a, b, c, words[i + 9], s[9], k[9]); c = ff(c, d, a, b, words[i + 10], s[10], k[10]); b = ff(b, c, d, a, words[i + 11], s[11], k[11]);
-    a = ff(a, b, c, d, words[i + 12], s[12], k[12]); d = ff(d, a, b, c, words[i + 13], s[13], k[13]); c = ff(c, d, a, b, words[i + 14], s[14], k[14]); b = ff(b, c, d, a, words[i + 15], s[15], k[15]);
-    a = gg(a, b, c, d, words[i + 1], s[16], k[16]); d = gg(d, a, b, c, words[i + 6], s[17], k[17]); c = gg(c, d, a, b, words[i + 11], s[18], k[18]); b = gg(b, c, d, a, words[i + 0], s[19], k[19]);
-    a = gg(a, b, c, d, words[i + 5], s[20], k[20]); d = gg(d, a, b, c, words[i + 10], s[21], k[21]); c = gg(c, d, a, b, words[i + 15], s[22], k[22]); b = gg(b, c, d, a, words[i + 4], s[23], k[23]);
-    a = gg(a, b, c, d, words[i + 9], s[24], k[24]); d = gg(d, a, b, c, words[i + 14], s[25], k[25]); c = gg(c, d, a, b, words[i + 3], s[26], k[26]); b = gg(b, c, d, a, words[i + 8], s[27], k[27]);
-    a = gg(a, b, c, d, words[i + 13], s[28], k[28]); d = gg(d, a, b, c, words[i + 2], s[29], k[29]); c = gg(c, d, a, b, words[i + 7], s[30], k[30]); b = gg(b, c, d, a, words[i + 12], s[31], k[31]);
-    a = hh(a, b, c, d, words[i + 5], s[32], k[32]); d = hh(d, a, b, c, words[i + 8], s[33], k[33]); c = hh(c, d, a, b, words[i + 11], s[34], k[34]); b = hh(b, c, d, a, words[i + 14], s[35], k[35]);
-    a = hh(a, b, c, d, words[i + 1], s[36], k[36]); d = hh(d, a, b, c, words[i + 4], s[37], k[37]); c = hh(c, d, a, b, words[i + 7], s[38], k[38]); b = hh(b, c, d, a, words[i + 10], s[39], k[39]);
-    a = hh(a, b, c, d, words[i + 13], s[40], k[40]); d = hh(d, a, b, c, words[i + 0], s[41], k[41]); c = hh(c, d, a, b, words[i + 3], s[42], k[42]); b = hh(b, c, d, a, words[i + 6], s[43], k[43]);
-    a = hh(a, b, c, d, words[i + 9], s[44], k[44]); d = hh(d, a, b, c, words[i + 12], s[45], k[45]); c = hh(c, d, a, b, words[i + 15], s[46], k[46]); b = hh(b, c, d, a, words[i + 2], s[47], k[47]);
-    a = ii(a, b, c, d, words[i + 0], s[48], k[48]); d = ii(d, a, b, c, words[i + 7], s[49], k[49]); c = ii(c, d, a, b, words[i + 14], s[50], k[50]); b = ii(b, c, d, a, words[i + 5], s[51], k[51]);
-    a = ii(a, b, c, d, words[i + 12], s[52], k[52]); d = ii(d, a, b, c, words[i + 3], s[53], k[53]); c = ii(c, d, a, b, words[i + 10], s[54], k[54]); b = ii(b, c, d, a, words[i + 1], s[55], k[55]);
-    a = ii(a, b, c, d, words[i + 8], s[56], k[56]); d = ii(d, a, b, c, words[i + 15], s[57], k[57]); c = ii(c, d, a, b, words[i + 6], s[58], k[58]); b = ii(b, c, d, a, words[i + 13], s[59], k[59]);
-    a = ii(a, b, c, d, words[i + 4], s[60], k[60]); d = ii(d, a, b, c, words[i + 11], s[61], k[61]); c = ii(c, d, a, b, words[i + 2], s[62], k[62]); b = ii(b, c, d, a, words[i + 9], s[63], k[63]);
-    a = add(a, oa); b = add(b, ob); c = add(c, oc); d = add(d, od);
-  }
-  function hex(n) {
-    let s = '';
-    for (let i = 0; i < 4; i++) s += ((n >> (i * 8)) & 0xff).toString(16).padStart(2, '0');
-    return s;
-  }
-  return hex(a) + hex(b) + hex(c) + hex(d);
+function pemToBytes(pem) {
+  const b64 = pem.replace(/-----BEGIN PUBLIC KEY-----/, '')
+    .replace(/-----END PUBLIC KEY-----/, '')
+    .replace(/\s+/g, '');
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf;
+}
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf;
 }
 
-/* ---------- 爱发电签名 ---------- */
-// 开放平台「下单」类接口：sign = md5( params_json_string + token )
-function md5Sign(paramsObj, token) {
-  return md5hex(JSON.stringify(paramsObj) + token);
-}
-// Webhook 回调：sign = md5( 排序后的 k=v 拼接 + token )
-function md5Webhook(params, token) {
-  const keys = Object.keys(params).filter((k) => k !== 'sign').sort();
-  const raw = keys.map((k) => k + '=' + params[k]).join('&') + token;
-  return md5hex(raw);
+/**
+ * 校验爱发电 Webhook 签名。
+ * sign_str = out_trade_no + user_id + plan_id + total_amount（按文档顺序直接拼接）
+ * sign     = 爱发电私钥 RSA-SHA256 签名（base64），用官方公钥验证。
+ * 返回 true 才代表这确实是爱发电发来的真实订单。
+ */
+async function verifyAfdianSign(order, signB64) {
+  if (!signB64 || typeof signB64 !== 'string') return false;
+  try {
+    const signStr =
+      String(order.out_trade_no || '') +
+      String(order.user_id || '') +
+      String(order.plan_id || '') +
+      String(order.total_amount || '');
+    const key = await crypto.subtle.importKey(
+      'spki',
+      pemToBytes(AFDIAN_PUBLIC_KEY),
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    const sig = b64ToBytes(signB64);
+    const data = new TextEncoder().encode(signStr);
+    return await crypto.subtle.verify({ name: 'RSASSA-PKCS1-v1_5' }, key, sig, data);
+  } catch (e) {
+    return false;
+  }
 }
 
 /* ---------- 端点实现 ---------- */
@@ -160,10 +159,9 @@ async function handleStatus(url, env, cors) {
 /**
  * 生成爱发电「下单页」链接。
  *
- * ⚠️ 重要更正：爱发电开放平台**没有**「创建订单」的 API
- * （只有 ping / query-order / query-sponsor），所以不能由后端下单。
- * 但爱发电的下单页支持 URL 参数，其中 custom_order_id 会原样带回 webhook，
- * 我们借它把玩家 uid 编码进订单（dnw_<uid>），回调时再取回来完成解锁。
+ * 爱发电开放平台**没有**「创建订单」的 API（只有 ping / query-order / query-sponsor），
+ * 所以不能由后端下单。但爱发电的下单页支持 URL 参数，其中 custom_order_id 会原样带回
+ * webhook，我们借它把玩家 uid 编码进订单（dnw_<uid>），回调时再取回来完成解锁。
  */
 async function handlePayUrl(url, env, cors) {
   const uid = (url.searchParams.get('uid') || '').trim();
@@ -185,23 +183,32 @@ async function handlePayUrl(url, env, cors) {
 }
 
 async function handleWebhook(request, env, cors) {
+  // 兼容爱发电保存/验证时的 GET 探活：直接回 ec:200 即可
+  if (request.method === 'GET') return webhookOk(cors);
+
+  let body = {};
   const ct = request.headers.get('content-type') || '';
-  let params = {};
-  if (ct.includes('application/json')) {
-    params = await request.json().catch(() => ({}));
-  } else {
-    const form = await request.formData().catch(() => new Map());
-    for (const [k, v] of form.entries()) params[k] = v;
-  }
-  if (!env.AFDIAN_TOKEN) return json({ error: '未配置 token' }, 500, cors);
-  if (md5Webhook(params, env.AFDIAN_TOKEN) !== params.sign) {
-    return json({ error: 'sign mismatch' }, 403, cors);
+  try {
+    if (ct.includes('application/json')) {
+      body = await request.json().catch(() => ({}));
+    } else {
+      const form = await request.formData().catch(() => new Map());
+      for (const [k, v] of form.entries()) body[k] = v;
+    }
+  } catch (e) {
+    body = {};
   }
 
-  // 解析订单，找回 uid
-  let order = {};
-  try { order = typeof params.order === 'string' ? JSON.parse(params.order) : (params.order || {}); } catch (e) { order = {}; }
-  // 优先取 custom_order_id（下单页带过去的 dnw_<uid>），其次 out_trade_no，最后 remark
+  // 解析订单：官方结构为 { ec, em, data:{ type, order }, sign }；也兼容 order 在顶层
+  const data = (body.data && typeof body.data === 'object') ? body.data : {};
+  let order = data.order || body.order;
+  if (typeof order === 'string') {
+    try { order = JSON.parse(order); } catch (e) { order = {}; }
+  }
+  order = order || {};
+  const sign = body.sign || data.sign || '';
+
+  // 找回玩家 uid（下单页带过去的 dnw_<uid>），回退 out_trade_no / remark
   const customId = String(order.custom_order_id || '');
   const outTradeNo = String(order.out_trade_no || '');
   const remark = String(order.remark || '');
@@ -209,15 +216,19 @@ async function handleWebhook(request, env, cors) {
   if (customId.startsWith('dnw_')) uid = customId.slice(4);
   else if (outTradeNo.startsWith('dnw_')) uid = outTradeNo.slice(4);
   else if (remark.startsWith('dnw_')) uid = remark.slice(4);
-  else uid = remark;
 
-  // 已支付判定：爱发电 order.status === 3 表示已支付/已结算（按文档；如不同改这里）
-  const paid = order.status === 3 || order.status === '3' || order.pay_status === 'paid';
-  if (!uid) return json({ ok: true, skipped: 'no uid' }, 200, cors); // 签名对但没 uid，免得爱发电重试
-  if (paid) {
+  // 已支付判定：爱发电文档「status 2 为交易成功，目前仅会推送此类型」
+  const paid = Number(order.status) === 2 || Number(order.status) === 3;
+
+  // 校验爱发电签名（伪造请求过不了这关，因此不会写 KV）
+  const sigOk = await verifyAfdianSign(order, sign);
+
+  if (sigOk && paid && uid) {
     await env.DNW.put('paid:' + uid, todayStr(), { expirationTtl: 172800 }); // 两天后过期
   }
-  return json({ ok: true, uid, paid }, 200, cors);
+
+  // 无论校验结果都返回 ec:200（平台要求）；非法/未付请求不写 KV，故安全无白嫖风险
+  return webhookOk(cors);
 }
 
 async function handleMock(url, env, cors) {

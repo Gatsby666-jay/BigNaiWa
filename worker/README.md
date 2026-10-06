@@ -31,7 +31,7 @@ wrangler secret put MOCK_SECRET       # 随便设个字符串，例如 test123
 3. 填进 `wrangler.toml` 的 `[vars]`：
    ```toml
    SPONSOR_PLAN_ID = "你的plan_id"
-   SPONSOR_PLAN_URL = "https://ifdian.net/order/create"   # 默认，通常不用改
+   SPONSOR_PLAN_URL = "https://afdian.com/order/create"   # 默认，通常不用改
    ```
 4. 重新 `wrangler deploy`
 
@@ -58,8 +58,10 @@ wrangler deploy
 ```
 https://unlock.gatsbyw.cc.cd/api/afdian/webhook
 ```
-（签名算法本 Worker 已按爱发电文档实现；若哪天对不上，改 `worker/index.js` 里
-`md5Sign` / `md5Webhook` / `handleWebhook` 三处即可。）
+（爱发电 Webhook 自 2025-07 起改用「官方公钥 RSA-SHA256」验签，本 Worker 已按官方文档
+实现：sign_str = out_trade_no+user_id+plan_id+total_amount，用内置的 AFDIAN_PUBLIC_KEY
+做 verify。若哪天对不上，改 `worker/index.js` 里 `verifyAfdianSign` / `AFDIAN_PUBLIC_KEY`
+两处即可。注意：开发者响应必须含 `{"ec":200,"em":"ok"}`，否则爱发电后台保存回调会报错。）
 
 ## 6. 本地联调（无需真实支付）
 部署时设了 `MOCK_SECRET` 的话：
