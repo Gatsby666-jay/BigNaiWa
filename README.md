@@ -120,7 +120,7 @@ python -m http.server 8080
 | `stamina.js` | 体力值系统：每日 1 点、按天重置、开局扣减；打赏解锁改由后端 `/api/status` 校验 |
 | `config.js` | 前端全局配置：`API_BASE`（解锁后端地址），部署 Worker 后填入 |
 | `worker/` | 解锁后端（Cloudflare Workers + KV）：`/api/status`、`/api/pay-url`、爱发电 `/api/afdian/webhook` 回调，详见 `worker/README.md` |
-| `assets/fruits/` | 水果贴图：`*.png` 是 512×512 的源图，页面实际加载的是 `*.webp`；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
+| `assets/fruits/` | 水果贴图：`*.png` 是 512×512、**页面实际加载的就是它**（高分屏更清晰）；`*.webp` 是旧版按显示尺寸裁小的产物，已停用；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
 | `tools/normalize_assets.py` | 素材统一脚本：抠底、去噪、统一画布、烤暗边 |
 | `tools/optimize_sprites.py` | 把源图压成 WebP 并裁到每级实际需要的尺寸（1.45 MB → 0.19 MB） |
 | `tools/make_blur.py` | 生成极模糊占位图 `blur.js`（11 张缩略图拼成一条、内联成 data URL，约 8 KB） |
@@ -239,18 +239,19 @@ python tools/build_parts.py --max-parts 16 --preview
 
 规格：**正方形、透明底、主体居中占长边 92%**，贴图会跟着水果一起滚动/旋转。
 
-**页面加载的是 `.webp`，`.png` 只是给工具用的源图。** 源图统一是 512×512，但打包时会按每一级
-在游戏里的实际显示尺寸裁到刚好（最小的葡萄只要 76×76），再用有损 WebP q88 压一遍：
-**1.45 MB → 0.19 MB**。这一步不能省 —— 贴图一共才 11 张，原来在慢网下要好几秒才出图，
-这几秒里玩家看到的是兜底的程序化水果（一堆卡通脸），反馈就是"图挂了"。
+**页面现在直接加载 512×512 的 `*.png` 源图**（见 `game.js` 的 `FRUITS[].file`）。
+早期版本为了省体积，会把源图按每一级在游戏里的实际显示尺寸裁小（最小的葡萄只裁到 76×76）
+再压成有损 WebP（**1.45 MB → 0.19 MB**）。但 `drawImage` 是在高分屏上按 DPR 放大绘制的，
+源图一被裁小，DPR≥2 的屏幕上就会被拉伸糊掉——这正是"水果图像太模糊"的根因。
+因此现在改为**原图直出**：11 张 512 PNG 合计约 1.5 MB，换来任何屏幕都不糊。
+（若你更在意首屏体积，可改回 `optimize_sprites.py` 的无损模式，但务必保持各档 ≥ 显示尺寸 × DPR。）
 
 ```bash
-python tools/optimize_sprites.py            # 默认 q88，会打印每一张的体积对比
-python tools/optimize_sprites.py --lossless # 想完全无损就用这个（0.59 MB）
+# 旧流程（现已停用，仅作参考）：把源图压成 WebP 并裁到每级尺寸
+# python tools/optimize_sprites.py --lossless
 ```
 
-换完贴图后注意两点：跑一次 `optimize_sprites.py` 生成新的 `.webp`；
-碰撞形状是按源图 alpha 算的，所以还要跑一次 `tools/build_parts.py`。
+换完贴图后注意：碰撞形状是按源图 alpha 算的，所以还要跑一次 `tools/build_parts.py`。
 
 另外 `game.js` 的 `loadSprites()` 对每张图**失败会退避重试 3 次**（弱网下一次拉不到很常见），
 全部失败才回退，不影响玩。

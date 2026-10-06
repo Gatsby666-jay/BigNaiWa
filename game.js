@@ -52,27 +52,27 @@
 
   const FRUITS = [
     { name: '葡萄',   r: 17,  c1: '#c084f5', c2: '#7a3fb0', line: 'rgba(74,26,120,.35)',
-      file: 'assets/fruits/01-grape.webp',     pc1: '#e9c466', pc2: '#b8903a' },
+      file: 'assets/fruits/01-grape.png',     pc1: '#e9c466', pc2: '#b8903a' },
     { name: '樱桃',   r: 23,  c1: '#ff8a99', c2: '#c62346', line: 'rgba(120,10,40,.35)',
-      file: 'assets/fruits/02-cherry.webp',    pc1: '#ffe684', pc2: '#d8b44f' },
+      file: 'assets/fruits/02-cherry.png',    pc1: '#ffe684', pc2: '#d8b44f' },
     { name: '橘子',   r: 31,  c1: '#ffc06a', c2: '#e0741a', line: 'rgba(140,62,0,.32)',
-      file: 'assets/fruits/03-orange.webp',    pc1: '#fdd865', pc2: '#cfa63f' },
+      file: 'assets/fruits/03-orange.png',    pc1: '#fdd865', pc2: '#cfa63f' },
     { name: '柠檬',   r: 39,  c1: '#fff285', c2: '#e0b000', line: 'rgba(140,110,0,.32)',
-      file: 'assets/fruits/04-lemon.webp',     pc1: '#f6cd63', pc2: '#c9a040' },
+      file: 'assets/fruits/04-lemon.png',     pc1: '#f6cd63', pc2: '#c9a040' },
     { name: '猕猴桃', r: 48,  c1: '#b9e05a', c2: '#5d8c1c', line: 'rgba(60,90,10,.32)',
-      file: 'assets/fruits/05-kiwi.webp',      pc1: '#c4a559', pc2: '#94793c' },
+      file: 'assets/fruits/05-kiwi.png',      pc1: '#c4a559', pc2: '#94793c' },
     { name: '番茄',   r: 58,  c1: '#ff8a66', c2: '#c62f28', line: 'rgba(120,20,10,.32)',
-      file: 'assets/fruits/06-tomato.webp',    pc1: '#fbd75a', pc2: '#cba63c' },
+      file: 'assets/fruits/06-tomato.png',    pc1: '#fbd75a', pc2: '#cba63c' },
     { name: '桃子',   r: 69,  c1: '#ffd0d0', c2: '#ea7f93', line: 'rgba(160,60,80,.3)',
-      file: 'assets/fruits/07-peach.webp',     pc1: '#f7c45a', pc2: '#c99a3e' },
+      file: 'assets/fruits/07-peach.png',     pc1: '#f7c45a', pc2: '#c99a3e' },
     { name: '菠萝',   r: 81,  c1: '#ffe07a', c2: '#c88a12', line: 'rgba(130,80,0,.32)',
-      file: 'assets/fruits/08-pineapple.webp', pc1: '#ffd37b', pc2: '#d1a252' },
+      file: 'assets/fruits/08-pineapple.png', pc1: '#ffd37b', pc2: '#d1a252' },
     { name: '椰子',   r: 94,  c1: '#f0e2c6', c2: '#9b7b4f', line: 'rgba(90,64,32,.35)',
-      file: 'assets/fruits/09-coconut.webp',   pc1: '#ffd771', pc2: '#d3a94e' },
+      file: 'assets/fruits/09-coconut.png',   pc1: '#ffd771', pc2: '#d3a94e' },
     { name: '半奶蛙', r: 108, c1: '#ff9d78', c2: '#c23a2c', line: 'rgba(120,24,16,.32)',
-      file: 'assets/fruits/10-halfmelon.webp', pc1: '#ccab68', pc2: '#9c8047' },
+      file: 'assets/fruits/10-halfmelon.png', pc1: '#ccab68', pc2: '#9c8047' },
     { name: '神奶蛙', r: 124, c1: '#7ce878', c2: '#1c8a33', line: 'rgba(12,70,24,.4)',
-      file: 'assets/fruits/11-watermelon.webp', pc1: '#eece9b', pc2: '#c0a271' }
+      file: 'assets/fruits/11-watermelon.png', pc1: '#eece9b', pc2: '#c0a271' }
   ];
 
   /* 合成出 tier 的得分（三角数） */
@@ -209,7 +209,7 @@
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     canvas.width  = Math.max(1, Math.round(rect.width  * dpr));
     canvas.height = Math.max(1, Math.round(rect.height * dpr));
     view.dpr = dpr;
