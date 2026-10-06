@@ -235,7 +235,8 @@
     flash: 0,
     revives: 0,        // 本局还剩几枚复活币（重开清零）
     reviveGiven: 0,    // 本局已经发放过几次（用来判断跨过新的 2000 分）
-    freeze: 0          // 命中定格剩余秒数
+    freeze: 0,         // 命中定格剩余秒数
+    locked: false      // 体力/解锁未通过时锁死棋盘，禁止投放（防退出重进白嫖）
   };
 
   /* ---------------------------------------------------------
@@ -664,6 +665,10 @@
 
   function tryDrop() {
     if (state.over || !state.ready) return;
+    if (state.locked) {                     // 体力/解锁未通过：重新弹窗并拒绝投放
+      if (window.DanaiwaStamina) window.DanaiwaStamina.blocked();
+      return;
+    }
     const tier = state.pending;
     const [lo, hi] = aimLimit(tier);
     const x = clamp(state.aimX, lo, hi);
@@ -778,10 +783,15 @@
     /* —— 体力值校验：每天 1 点，用完需打赏解锁今日无限畅玩 —— */
     if (window.DanaiwaStamina) {
       if (!window.DanaiwaStamina.canStart()) {
-        window.DanaiwaStamina.blocked();   // 体力已用完：弹赞助码，提示打赏
-        return;
+        window.DanaiwaStamina.blocked();    // 体力已用完：弹赞助弹窗，提示打赏
+        state.locked = true;                // 锁死棋盘：关掉弹窗也投不了（防退出重进白嫖）
+        /* 不 return：继续把棋盘初始化好以便渲染，但 locked 会阻止投放 */
+      } else {
+        window.DanaiwaStamina.consume();     // 扣 1 点体力（已解锁则不扣）
+        state.locked = false;
       }
-      window.DanaiwaStamina.consume();      // 扣 1 点体力（已解锁则不扣）
+    } else {
+      state.locked = false;
     }
 
     state.balls.length = 0;
