@@ -185,10 +185,13 @@
 <!-- 体力值系统（每日 1 点，后端校验打赏解锁无限） -->
 <script src="config.js"></script>
 <script src="stamina.js"></script>
-<script src="game.js"></script>
 <!-- 排行榜 -->
 <script src="leaderboard.min.js"></script>
-<!-- 赞助作者 -->
+<!-- 赞助作者：必须在 game.js 之前加载。
+     否则首次进入若当天体力已耗尽，boot() 调 reset()→blocked() 时
+     window.DanaiwaSponsor 还没定义，弹窗打不开、棋盘却被锁死 → 看起来像“画面卡住”。 -->
 <script src="sponsor.js"></script>
+<!-- 游戏主逻辑（放最后，确保上面的模块都已就绪） -->
+<script src="game.js"></script>
 </body>
 </html>

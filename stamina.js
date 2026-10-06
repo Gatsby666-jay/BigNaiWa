@@ -97,7 +97,15 @@
   /* 体力不够时：打开赞助弹窗，引导玩家真实打赏解锁 */
   function blocked() {
     render();
-    if (window.DanaiwaSponsor) window.DanaiwaSponsor.open();
+    if (window.DanaiwaSponsor) {
+      window.DanaiwaSponsor.open();
+    } else {
+      /* 兜底：极个别情况下赞助模块还没就绪（脚本加载顺序问题），
+         等一拍再弹，避免“棋盘被锁死却没有任何提示”看起来像卡死 */
+      setTimeout(function () {
+        if (window.DanaiwaSponsor) window.DanaiwaSponsor.open();
+      }, 0);
+    }
   }
 
   function mount() {
