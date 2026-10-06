@@ -123,9 +123,9 @@ python -m http.server 8080
 | `stamina.js` | 体力值系统：每日 1 点、按天重置、开局扣减；打赏解锁改由后端 `/api/status` 校验 |
 | `config.js` | 前端全局配置：`API_BASE`（解锁后端地址），部署 Worker 后填入 |
 | `worker/` | 解锁后端（Cloudflare Workers + KV）：`/api/status`、`/api/pay-url`、爱发电 `/api/afdian/webhook` 回调，详见 `worker/README.md` |
-| `assets/fruits/` | 水果贴图：`*.png` 是 512×512、**页面实际加载的就是它**（高分屏更清晰）；`*.webp` 是旧版按显示尺寸裁小的产物，已停用；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
+| `assets/fruits/` | 水果贴图：`*.png` 是 512×512 源图，**页面加载的是按 DPR 重采样后的 `*.webp`**（见 `game.js` 的 `FRUITS[].file`）；另有 `parts.js` 碰撞形状、`blur.js` 极模糊占位图 |
 | `tools/normalize_assets.py` | 素材统一脚本：抠底、去噪、统一画布、烤暗边 |
-| `tools/optimize_sprites.py` | 把源图压成 WebP 并裁到每级实际需要的尺寸（1.45 MB → 0.19 MB） |
+| `tools/optimize_for_speed.py` | 按 DPR 需求重采样水果源图 → `*.webp`（1.49 MB → 0.24 MB），并压缩赞助二维码 → `*.webp`（无损） |
 | `tools/make_blur.py` | 生成极模糊占位图 `blur.js`（11 张缩略图拼成一条、内联成 data URL，约 8 KB） |
 | `tools/build_parts.py` | 按贴图轮廓生成碰撞形状，产出 `assets/fruits/parts.js` |
 | `src/` | 原始素材（11 张，格式/尺寸/底色都不统一），只作为脚本输入 |
@@ -242,17 +242,22 @@ python tools/build_parts.py --max-parts 16 --preview
 
 规格：**正方形、透明底、主体居中占长边 92%**，贴图会跟着水果一起滚动/旋转。
 
-**页面现在直接加载 512×512 的 `*.png` 源图**（见 `game.js` 的 `FRUITS[].file`）。
-早期版本为了省体积，会把源图按每一级在游戏里的实际显示尺寸裁小（最小的葡萄只裁到 76×76）
-再压成有损 WebP（**1.45 MB → 0.19 MB**）。但 `drawImage` 是在高分屏上按 DPR 放大绘制的，
-源图一被裁小，DPR≥2 的屏幕上就会被拉伸糊掉——这正是"水果图像太模糊"的根因。
-因此现在改为**原图直出**：11 张 512 PNG 合计约 1.5 MB，换来任何屏幕都不糊。
-（若你更在意首屏体积，可改回 `optimize_sprites.py` 的无损模式，但务必保持各档 ≥ 显示尺寸 × DPR。）
+**页面加载的是 `assets/fruits/*.webp`（见 `game.js` 的 `FRUITS[].file`），`.png` 是源图。**
+
+早期为了省体积，把源图按「CSS 显示尺寸」裁小再压 WebP（最小只 76×76）——但 `drawImage` 是
+按 DPR 放大绘制的，源图裁小后在高分屏被拉伸糊掉，这正是"水果图像太模糊"的根因。之后一度改成
+512 PNG 原图直出（≈1.5 MB），清晰但**首屏太重、进去慢**。
+
+现在用 `tools/optimize_for_speed.py` 取中间路线：**按每级水果的最大设备像素**（显示半径 × 2 ÷ 0.92
+× DPR 上限）重采样，再压成 WebP q90。既保证 DPR=3 也不糊，又把体积从 **1.49 MB → 0.24 MB**。
+其中低段（生成档 0-4 + 前几档合成）**先加载**，高段大图等首屏空闲后再补（`game.js` 的 `loadSprites()`），
+首屏只需要 ~0.1 MB。
 
 ```bash
-# 旧流程（现已停用，仅作参考）：把源图压成 WebP 并裁到每级尺寸
-# python tools/optimize_sprites.py --lossless
+python tools/optimize_for_speed.py     # 重采样水果 → *.webp，并压缩赞助二维码 → *.webp
 ```
+
+收款二维码用的是 **WebP 无损**（缩小到 450px 显示尺寸），保证扫码不受损。
 
 换完贴图后注意：碰撞形状是按源图 alpha 算的，所以还要跑一次 `tools/build_parts.py`。
 
