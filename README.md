@@ -119,7 +119,7 @@ python -m http.server 8080
 | `style.css` | 全部样式：玻璃拟态面板、响应式布局、结束动画、排行榜 |
 | `game.js` | 游戏逻辑 + 自研物理 + Canvas 渲染 + WebAudio 音效 |
 | `leaderboard.min.js` | 在线排行榜的构建产物（TinyWebDB 接口 + 弹窗渲染），页面直接引用它 |
-| `sponsor.js` | 结算页「赞助作者」弹窗（展示两个并排的微信收款码 `assets/sponsor-qr.jpg` / `sponsor-qr2.jpg`），纯静态、无网络请求 |
+| `sponsor.js` | 结算页「赞助作者」弹窗（并排展示支付宝收款码 `assets/sponsor-qr.jpg` 与微信收款码 `sponsor-qr2.jpg`），纯静态、无网络请求 |
 | `stamina.js` | 体力值系统：每日 1 点、按天重置、开局扣减；打赏解锁改由后端 `/api/status` 校验 |
 | `config.js` | 前端全局配置：`API_BASE`（解锁后端地址），部署 Worker 后填入 |
 | `worker/` | 解锁后端（Cloudflare Workers + KV）：`/api/status`、`/api/pay-url`、爱发电 `/api/afdian/webhook` 回调，详见 `worker/README.md` |

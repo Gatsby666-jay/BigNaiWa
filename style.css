@@ -188,8 +188,8 @@ body {
 }
 
 /* 两个收款码并排：桌面两列并排，窄屏自动堆叠。
-   两张图原始尺寸不同（834×818 与 573×580），统一按同一宽度渲染，
-   视觉尺寸一致、不错位；图片自带白底所以 padding 不影响观感。 */
+   两张图原始宽高比略有差异（834×818 与 573×580），
+   强制 1:1 + object-fit: contain 让两者渲染尺寸**严格一致**、不错位。 */
 .qr-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -210,7 +210,9 @@ body {
 
 .qr-item .sponsor-qr {
   width: 100%;
-  max-width: 150px;      /* 两码同宽：视觉尺寸严格一致 */
+  max-width: 150px;      /* 两码同宽 + 同高（1:1）→ 视觉尺寸严格一致 */
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
   margin: 0;
 }
 
@@ -223,7 +225,16 @@ body {
 }
 
 @media (max-width: 420px) {
-  .qr-item .sponsor-qr { max-width: 132px; }
+  /* 窄屏（≈手机竖屏）仍保持两列并排，只把单个码缩一点，
+     既不错位也不横向溢出；gap 收窄给二维码让出宽度。 */
+  .qr-row { gap: 8px; }
+  .qr-item .sponsor-qr { max-width: 40vw; }
+}
+
+/* 极窄屏（≤300px，如小屏折叠机）才堆叠，避免两个码挤成一条线 */
+@media (max-width: 300px) {
+  .qr-row { grid-template-columns: 1fr; }
+  .qr-item .sponsor-qr { max-width: 150px; }
 }
 
 .sponsor-hint {
