@@ -18,4 +18,4 @@ SPONSOR_AMOUNT = "6.60"
 # 爱发电下单页（默认 ifdian.net，若跳转到你的主页不对，改这里）
 SPONSOR_PLAN_URL = "https://ifdian.net/order/create"
 # 爱发电「方案/档位」ID：去爱发电后台建一个档位，从下单链接里取 plan_id 填到这里
-SPONSOR_PLAN_ID = "REPLACE_WITH_YOUR_PLAN_ID"
+SPONSOR_PLAN_ID = "3123b2c4c17511f190565254001e7c00"
