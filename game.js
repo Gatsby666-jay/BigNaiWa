@@ -874,6 +874,10 @@
     const f = FRUITS[tier];
     const s = scale === undefined ? 1 : scale;
 
+    /* 防御：非法/极小半径直接不画。程序化兜底里有 arc(r - lineWidth/2)，
+       r 太小时会算出负半径，canvas 会抛 IndexSizeError 并中断整帧。 */
+    if (!(r > 0.5)) return;
+
     c.save();
     c.translate(x, y);
     /* 撞击挤压：沿法线压扁、垂直拉伸（世界坐标，先于水果自身旋转） */
@@ -948,7 +952,7 @@
     c.lineWidth = Math.max(1.4, r * 0.055);
     c.strokeStyle = f.line;
     c.beginPath();
-    c.arc(0, 0, r - c.lineWidth * 0.5, 0, Math.PI * 2);
+    c.arc(0, 0, Math.max(0.5, r - c.lineWidth * 0.5), 0, Math.PI * 2);
     c.stroke();
 
     /* 高光 */
@@ -1167,8 +1171,14 @@
      且绘制时直接用 CSS 像素坐标即可。 */
   function fitPreview(cv, c) {
     const rect = cv.getBoundingClientRect();
-    const cssW = rect.width  || cv.clientWidth  || 1;
-    const cssH = rect.height || cv.clientHeight || 1;
+    const cssW = Math.round(rect.width);
+    const cssH = Math.round(rect.height);
+    /* 元素没参与布局（移动端 .next-box / .chain-box 是 display:none，
+       rect 全 0）——此时根本不可见，直接跳过绘制。
+       早期版本这里回退成 1×1，会让 drawNext 算出 ~0.4px 的半径，
+       兜底路径里再减 lineWidth/2 变负 → arc 抛 IndexSizeError →
+       连带把 boot() 打断（贴图/动画循环都起不来），手机端直接玩不了。 */
+    if (cssW <= 0 || cssH <= 0) return null;
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const bw = Math.max(1, Math.round(cssW * dpr));
     const bh = Math.max(1, Math.round(cssH * dpr));
@@ -1181,7 +1191,9 @@
   }
 
   function drawNext() {
-    const { w, h } = fitPreview(nextCanvas, nextCtx);
+    const fit = fitPreview(nextCanvas, nextCtx);
+    if (!fit) return;                       // 面板在移动端是隐藏的，不画
+    const { w, h } = fit;
     nextCtx.clearRect(0, 0, w, h);
     const tier = state.next;
     const r = FRUITS[tier].r;
@@ -1191,7 +1203,9 @@
 
   /* 面板中的“合成表” */
   function drawChain() {
-    const { w: cw, h: ch } = fitPreview(chainCanvas, chainCtx);
+    const fit = fitPreview(chainCanvas, chainCtx);
+    if (!fit) return;                       // 面板在移动端是隐藏的，不画
+    const cw = fit.w, ch = fit.h;
     chainCtx.clearRect(0, 0, cw, ch);
 
     const slot = cw / FRUITS.length;
