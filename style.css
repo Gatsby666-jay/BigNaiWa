@@ -32,8 +32,8 @@
 [hidden] { display: none !important; }
 
 html, body {
-  height: 100%;
-  overscroll-behavior: none;   /* 禁掉下拉刷新 / 橡皮筋 */
+  min-height: 100%;
+  overscroll-behavior: none;   /* 禁掉下拉刷新 / 橡皮筋（不影响页面正常纵向滚动） */
 }
 
 body {
@@ -47,9 +47,13 @@ body {
     radial-gradient(900px 600px at 104% -6%,  #d5f0ff 0%, transparent 55%),
     radial-gradient(1000px 780px at 50% 118%, #ffdbe6 0%, transparent 62%),
     #fff9f1;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
+  /* 纵向可滚动：内容超高（如小屏手机）能往下翻；横向禁止溢出。
+     用 flex 纵向布局 + align-items:center（只做水平居中），不写 justify-content，
+     避免「内容比视口高时顶部被纵向居中裁掉、且滚不上去」的经典坑。 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
   touch-action: manipulation;          /* 干掉双击缩放 */
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
@@ -61,7 +65,8 @@ body {
   display: flex;
   align-items: stretch;
   gap: 20px;
-  max-height: 100%;
+  max-height: none;
+  margin: auto;   /* 内容矮时竖直居中；超高时回到顶部、整页可滚动 */
 }
 
 /* ---------------- 游戏区 ---------------- */
@@ -980,8 +985,9 @@ body {
     justify-content: flex-start;   /* 信息条钉在顶上 */
     gap: 8px;
     width: 100%;
-    height: 100%;
+    min-height: 100%;   /* 至少铺满一屏；内容超高时整页可下滑 */
     max-height: none;
+    margin: 0;          /* 移动端顶满，不需要居中留白 */
   }
 
   /* 面板是 DOM 里靠后的，用 order 提到棋盘上面 */
