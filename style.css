@@ -410,6 +410,60 @@ body {
   100% { transform: scale(1); }
 }
 
+/* 连击提示：浮在棋盘顶部中央，纯展示、不挡操作 */
+.combo-badge {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(135deg, #ff7a59, #ff4d6d 60%, #b13bff);
+  box-shadow: 0 6px 18px rgba(255, 77, 109, .45), inset 0 1px 0 rgba(255, 255, 255, .4);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.combo-badge .combo-mult { font-size: 12px; opacity: .92; font-weight: 800; }
+.combo-badge.pop { animation: comboPop .4s cubic-bezier(.2, .9, .3, 1.5); }
+@keyframes comboPop {
+  0%   { transform: translateX(-50%) scale(.8); }
+  45%  { transform: translateX(-50%) scale(1.18); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .combo-badge.pop { animation: none; } }
+
+/* 结算评级 */
+.rating-wrap { margin: 0 0 16px; }
+.rating {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  border-radius: 18px;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+  background: #c7b6a3;
+  box-shadow: 0 8px 20px rgba(120, 84, 44, .25);
+}
+.rating.grade-s { background: linear-gradient(135deg, #ffd86b, #ff8a3d); color: #5a3200; }
+.rating.grade-a { background: linear-gradient(135deg, #6fd1ff, #3b8bff); }
+.rating.grade-b { background: linear-gradient(135deg, #7ee0a6, #2fb87e); }
+.rating.grade-c { background: linear-gradient(135deg, #c8b6a3, #9c8674); }
+.rating-txt { margin: 8px 0 0; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+
 /* 合成表底下那行规则说明 */
 .chain-note {
   margin: 6px 0 0;
@@ -829,6 +883,57 @@ body {
   outline: 2px solid var(--brand);
   outline-offset: -2px;
 }
+
+/* 成就弹窗列表 */
+.ach-list {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px;
+}
+.ach-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .9);
+  box-shadow: 0 2px 6px rgba(140, 96, 56, .09);
+  opacity: .6;
+}
+.ach-row.got { opacity: 1; background: linear-gradient(100deg, #fff7e0, #ffe9bf); }
+.ach-ico { flex: 0 0 30px; font-size: 22px; text-align: center; }
+.ach-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.ach-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+.ach-desc { font-size: 11.5px; color: var(--ink-soft); }
+.ach-state { flex: 0 0 auto; font-size: 12px; font-weight: 700; color: #b8a98f; }
+.ach-row.got .ach-state { color: #14b86a; }
+
+/* 成就解锁提示 */
+.ach-toast {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%) translateY(-16px);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #5a3200;
+  background: linear-gradient(135deg, #ffe6a3, #ffc247);
+  box-shadow: 0 10px 28px rgba(200, 130, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s ease, transform .3s ease;
+}
+.ach-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.ach-toast-ico { font-size: 18px; }
 
 .modal-foot {
   display: flex;
