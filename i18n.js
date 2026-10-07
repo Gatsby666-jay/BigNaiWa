@@ -53,6 +53,7 @@
       'over.nick': '昵称：',
       'over.editname': '改昵称',
       'over.challenge.line': '今日剩余挑战次数 {n} / 5',
+      'over.challenge.lineUnlimited': '今日挑战次数：无限（已解锁畅玩）',
 
       'submit.init': '正在结算…',
 
@@ -67,13 +68,15 @@
       'fx.revive': '+1 复活币',
 
       'challenge.title': '⏱ 限时挑战',
-      'challenge.rules': '60 秒内尽可能拿高分！时间一到立刻结算；<strong>水果越线也不会判负</strong>，放心猛投。每天的挑战次数独立于体力，用完等明天。',
+      'challenge.rules': '60 秒内尽可能拿高分！时间一到立刻结算；<strong>水果越线也不会判负</strong>，放心猛投。每天 5 次机会，独立于体力；<strong>打赏解锁今日畅玩后次数不限</strong>。',
       'challenge.remain': '今日剩余挑战次数：<strong>{n} / 5</strong>',
+      'challenge.remainUnlimited': '今日挑战次数：<strong>无限</strong>（已解锁今日畅玩）',
       'challenge.footNote': '每次挑战 60 秒，消耗当天 1 次机会',
       'challenge.start': '开始挑战',
       'challenge.close': '关闭',
       'challenge.exhausted': '今日挑战次数已用完，明天再来～',
       'challenge.btn.again': '⏱ 再挑战（剩 {n}）',
+      'challenge.btn.againUnlimited': '⏱ 再挑战（无限）',
       'challenge.btn.none': '今日挑战次数已用完',
       'challenge.hudLabel': '剩余时间',
 
@@ -187,6 +190,7 @@
       'over.nick': 'Nickname:',
       'over.editname': 'Edit',
       'over.challenge.line': 'Challenges left today: {n} / 5',
+      'over.challenge.lineUnlimited': 'Challenges today: unlimited (unlocked)',
 
       'submit.init': 'Submitting…',
 
@@ -201,13 +205,15 @@
       'fx.revive': '+1 revive coin',
 
       'challenge.title': '⏱ Timed Challenge',
-      'challenge.rules': 'Score as much as you can in 60 seconds! The round ends when time is up; <strong>crossing the line won\'t end it</strong>, so keep dropping. Challenge tries are separate from stamina and reset daily.',
+      'challenge.rules': 'Score as much as you can in 60 seconds! The round ends when time is up; <strong>crossing the line won\'t end it</strong>, so keep dropping. 5 tries a day, separate from stamina; <strong>unlimited after you support the author (today)</strong>.',
       'challenge.remain': 'Tries left today: <strong>{n} / 5</strong>',
+      'challenge.remainUnlimited': 'Tries today: <strong>Unlimited</strong> (today unlocked)',
       'challenge.footNote': 'Each run lasts 60s and uses one of today\'s tries',
       'challenge.start': 'Start',
       'challenge.close': 'Close',
       'challenge.exhausted': 'No tries left today. Come back tomorrow!',
       'challenge.btn.again': '⏱ Retry ({n} left)',
+      'challenge.btn.againUnlimited': '⏱ Retry (unlimited)',
       'challenge.btn.none': 'No tries left today',
       'challenge.hudLabel': 'Time left',
 
