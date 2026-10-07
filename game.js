@@ -41,6 +41,15 @@
   const RESTART_MIN_SCORE = 4000;
   const RESTART_HINT = '达到 ' + RESTART_MIN_SCORE + ' 分才能重开';
 
+  /* 「连击」：窗口内每发生一次合成，连击数 +1，得分按倍率结算。
+     倍率随连击线性增长，封顶 ×2 —— 让连续合成更上头，但不至于爆炸。 */
+  const COMBO_WINDOW = 1.5;   // 连击窗口（秒）：超过这个时间没再合成，连击清零
+  const COMBO_STEP   = 0.1;   // 每多 1 连击，倍率 +(1 + 0.1×(连击-1))
+  const COMBO_MAX    = 2.0;   // 倍率上限 ×2
+
+  /* 成就持久化键 */
+  const ACH_KEY = 'dnw_ach_v1';
+
   /* —— Q 弹手感 —— */
   const RESTITUTION      = 0.38;  // 球与球之间的弹性
   const WALL_RESTITUTION = 0.45;  // 撞墙 / 撞地面的弹性
@@ -117,6 +126,20 @@
   const giveUpBtn      = document.getElementById('giveUpBtn');
   const reviveBadge    = document.getElementById('reviveBadge');
   const reviveCountEl  = document.getElementById('reviveCount');
+
+  /* 连击徽章 / 结算评级 / 成就提示 的 DOM 句柄（元素缺失时一律兜底跳过，不报错） */
+  const comboEl      = document.getElementById('comboBadge');
+  const comboNumEl   = document.getElementById('comboNum');
+  const comboMultEl  = document.getElementById('comboMult');
+  const ratingEl     = document.getElementById('ratingEl');
+  const ratingTxtEl  = document.getElementById('ratingTxt');
+  const achToastEl   = document.getElementById('achToast');
+  const achToastIco  = document.getElementById('achToastIco');
+  const achToastName = document.getElementById('achToastName');
+  const achCountEl   = document.getElementById('achCount');
+  const achBtn       = document.getElementById('achBtn');
+  const achModalEl   = document.getElementById('achModal');
+  const achListEl    = document.getElementById('achList');
 
   /* ---------------------------------------------------------
    *  工具
@@ -255,7 +278,10 @@
     locked: false,     // 体力/解锁未通过时锁死棋盘，禁止投放（防退出重进白嫖）
     bestBeaten: false, // 本局是否已经刷新过最高分（用于只庆祝一次）
     ballsVersion: 0,   // 棋盘水果列表变更计数：渲染层靠它判断是否需要重排序
-    shake: 0           // 屏幕震动剩余强度（px），仅影响绘制偏移，不改物理/坐标
+    shake: 0,          // 屏幕震动剩余强度（px），仅影响绘制偏移，不改物理/坐标
+    combo: 0,          // 当前连击数（窗口内连续合成）
+    comboTimer: 0,     // 连击窗口剩余时间（秒），归零则连击清零
+    comboMax: 0        // 本局最高连击数（用于成就 / 结算展示）
   };
 
   /* ---------------------------------------------------------
@@ -562,6 +588,8 @@
            注意：它同时清掉了两块最大的水果，是后期唯一的泄压阀，不能取消。
            分数的飘字不用 addScore 那个普通的，下面单独给了「大字 +500」。 */
         addScore(MAX_BONUS);
+        registerCombo();              // 双蛙齐炸也算一次连击（给连续操作的人一点甜头）
+        unlockAchievement('twin_god');
         burst(mx, my, MAX_TIER, 90, 560);
         burst(mx, my, MAX_TIER - 2, 42, 340);
         Sound.bonus();
@@ -588,11 +616,16 @@
         state.balls.push(nb);
         bumpBalls();
 
-        addScore(MERGE_SCORE[nt], mx, my, '+' + MERGE_SCORE[nt]);
+        registerCombo();
+        /* 连击倍率只在这里（普通合成）施加；神奶蛙分支保持 +500 不变，
+           否则会破坏「神奶蛙炸场后 score 必须正好是 MAX_BONUS」的测试断言。 */
+        const cm = comboMult();
+        const gain = Math.round(MERGE_SCORE[nt] * cm);
+        addScore(gain, mx, my, '+' + gain);
         burst(mx, my, nt, 8 + nt * 2, 140 + nt * 22);
         Sound.merge(nt);
         haptic(6 + nt);
-        if (nt === MAX_TIER) state.flash = 1;
+        if (nt === MAX_TIER) { state.flash = 1; unlockAchievement('make_god'); }
       }
     }
 
@@ -714,12 +747,113 @@
       state.floats.push({ x, y, text: text || ('+' + n), life: 1 });
     }
     grantRevives();
+    if (state.score >= 1000) unlockAchievement('score1k');
+    if (state.score >= 5000) unlockAchievement('score5k');
   }
 
   function bump(el) {
     el.classList.remove('bump');
     void el.offsetWidth;
     el.classList.add('bump');
+  }
+
+  /* ---------------------------------------------------------
+   *  成就系统（持久化到 localStorage，跨局保留）
+   * ------------------------------------------------------- */
+
+  const ACHIEVEMENTS = [
+    { id: 'first_game', icon: '🎮', name: '初出茅庐', desc: '完成第一局游戏' },
+    { id: 'make_god',   icon: '🍉', name: '神奶蛙',   desc: '合成出神奶蛙（最大的那只）' },
+    { id: 'twin_god',   icon: '💥', name: '双蛙齐炸', desc: '让两只神奶蛙撞在一起' },
+    { id: 'score1k',    icon: '⭐', name: '千分快乐', desc: '单局得分达到 1000' },
+    { id: 'score5k',    icon: '🌟', name: '五千克星', desc: '单局得分达到 5000' },
+    { id: 'combo10',    icon: '🔥', name: '连击大师', desc: '单局达成 10 连击' },
+    { id: 'revive1',    icon: '🪙', name: '起死回生', desc: '使用一次复活币' },
+    { id: 'record',     icon: '🏆', name: '破纪录',   desc: '刷新你的最高分' }
+  ];
+
+  function loadAch() {
+    try { return JSON.parse(localStorage.getItem(ACH_KEY) || '{}') || {}; }
+    catch (e) { return {}; }
+  }
+  let achState = loadAch();
+
+  function unlockAchievement(id) {
+    if (achState[id]) return;
+    achState[id] = Date.now();
+    try { localStorage.setItem(ACH_KEY, JSON.stringify(achState)); } catch (e) {}
+    const def = ACHIEVEMENTS.find((a) => a.id === id);
+    if (def) showAchToast(def);
+    paintAchCount();
+  }
+
+  function showAchToast(def) {
+    if (!achToastEl || !achToastName) return;
+    if (achToastIco) achToastIco.textContent = def.icon;
+    achToastName.textContent = def.name;
+    achToastEl.hidden = false;
+    achToastEl.classList.remove('show');
+    void achToastEl.offsetWidth;
+    achToastEl.classList.add('show');
+    clearTimeout(showAchToast._t);
+    showAchToast._t = setTimeout(() => { achToastEl.classList.remove('show'); }, 2600);
+  }
+
+  function paintAchCount() {
+    if (!achCountEl) return;
+    const n = ACHIEVEMENTS.filter((a) => achState[a.id]).length;
+    achCountEl.textContent = n + '/' + ACHIEVEMENTS.length;
+  }
+
+  function renderAchList() {
+    if (!achListEl) return;
+    achListEl.innerHTML = '';
+    ACHIEVEMENTS.forEach((a) => {
+      const got = !!achState[a.id];
+      const row = document.createElement('div');
+      row.className = 'ach-row' + (got ? ' got' : '');
+      const ico = document.createElement('span');  ico.className = 'ach-ico';     ico.textContent = a.icon;
+      const meta = document.createElement('span'); meta.className = 'ach-meta';
+      const nm = document.createElement('span');   nm.className = 'ach-name';     nm.textContent = a.name;
+      const ds = document.createElement('span');   ds.className = 'ach-desc';     ds.textContent = a.desc;
+      meta.appendChild(nm); meta.appendChild(ds);
+      const st = document.createElement('span');   st.className = 'ach-state';    st.textContent = got ? '已达成' : '未达成';
+      row.appendChild(ico); row.appendChild(meta); row.appendChild(st);
+      achListEl.appendChild(row);
+    });
+  }
+
+  /* ---------------------------------------------------------
+   *  连击系统
+   * ------------------------------------------------------- */
+
+  function comboMult() {
+    if (state.combo < 2) return 1;
+    return Math.min(COMBO_MAX, 1 + COMBO_STEP * (state.combo - 1));
+  }
+
+  /* 一次合成发生：连击 +1，刷新窗口，刷新本局最高，并检查「连击大师」成就。 */
+  function registerCombo() {
+    state.combo++;
+    state.comboTimer = COMBO_WINDOW;
+    if (state.combo > state.comboMax) state.comboMax = state.combo;
+    if (state.combo >= 10) unlockAchievement('combo10');
+    showCombo();
+  }
+
+  function showCombo() {
+    if (!comboEl || !comboNumEl) return;
+    if (state.combo < 2) { comboEl.hidden = true; return; }
+    comboNumEl.textContent = state.combo;
+    if (comboMultEl) comboMultEl.textContent = '×' + comboMult().toFixed(1);
+    comboEl.hidden = false;
+    comboEl.classList.remove('pop');
+    void comboEl.offsetWidth;
+    comboEl.classList.add('pop');
+  }
+
+  function hideCombo() {
+    if (comboEl) comboEl.hidden = true;
   }
 
   /* ---------------------------------------------------------
@@ -791,10 +925,25 @@
     if (revivePromptEl) revivePromptEl.hidden = true;
     if (overPanelEl) overPanelEl.hidden = false;
     if (overlayEl) overlayEl.classList.add('show');
+    hideCombo();
+    computeRating();
+    unlockAchievement('first_game');
+    if (state.bestBeaten) unlockAchievement('record');
     /* 交给排行榜模块（没加载也不影响） */
     if (window.DanaiwaBoard && window.DanaiwaBoard.onGameOver) {
       window.DanaiwaBoard.onGameOver(state.score);
     }
+  }
+
+  /* 按本局得分给 S/A/B/C 评级 + 一句趣味文案（展示在结算页） */
+  function computeRating() {
+    const s = state.score;
+    let grade = 'C', txt = '继续加油', cls = 'grade-c';
+    if (s >= 6000)      { grade = 'S'; txt = '奶龙本龙！';   cls = 'grade-s'; }
+    else if (s >= 3500) { grade = 'A'; txt = '合成大师';     cls = 'grade-a'; }
+    else if (s >= 1500) { grade = 'B'; txt = '有点东西';     cls = 'grade-b'; }
+    if (ratingEl)   { ratingEl.textContent = grade; ratingEl.className = 'rating ' + cls; }
+    if (ratingTxtEl) ratingTxtEl.textContent = txt;
   }
 
   /* 越线那一屏：有复活币就先问一句 */
@@ -845,6 +994,7 @@
     state.cooldown = 0;
     state.flash = 0.6;               // 闪一下，让玩家知道救回来了
     state.shake = Math.max(state.shake, 8);   // 复活那一下也带点震动
+    unlockAchievement('revive1');
     if (revivePromptEl) revivePromptEl.hidden = true;
     if (overlayEl) overlayEl.classList.remove('show');
     paintRevives(false);
@@ -878,6 +1028,10 @@
     state.danger = false;
     state.bestBeaten = false;       // 新一局允许再次庆祝「新纪录」
     state.shake = 0;
+    state.combo = 0;               // 连击只在单局内有效
+    state.comboTimer = 0;
+    state.comboMax = 0;
+    hideCombo();
     bumpBalls();                    // 棋盘已清空，刷新绘制顺序缓存
     state.aimX = W / 2;
     state.revives = 0;        // 复活币只在本局有效，重开清零
@@ -892,6 +1046,9 @@
     scoreEl.textContent = '0';
     bestEl.textContent = state.best;
     syncRestartBtn();      // 新一局分数归零 → 重开按钮回到禁用态
+    if (ratingEl)   { ratingEl.textContent = ''; ratingEl.className = 'rating'; }
+    if (ratingTxtEl) ratingTxtEl.textContent = '';
+    paintAchCount();
     drawNext();
     Sound.ensure();
   }
@@ -1309,6 +1466,12 @@
     /* 清场命中定格：世界停一下，但画面照常重绘 */
     if (state.freeze > 0) { state.freeze = Math.max(0, state.freeze - dt); return; }
 
+    /* 连击窗口倒计时：过期则连击清零（游戏结束时不在此衰减，settle 会直接收起） */
+    if (state.comboTimer > 0) {
+      state.comboTimer -= dt;
+      if (state.comboTimer <= 0) { state.combo = 0; hideCombo(); }
+    }
+
     if (state.over) return;          // 结束后冻结棋盘（粒子特效仍在 render 里继续）
 
     if (!state.ready) {
@@ -1452,11 +1615,29 @@
     reset();
   });
 
-  /* 「再来一局」：不再直接开新局，而是滚动/跳转到「赞助作者」区域。 */
+  /* 「再来一局」：重开一局。体力校验在 reset() 内部完成（体力用完才弹赞助），
+     所以这里不再自动跳到赞助区 —— 游戏结束应当停在本局结算页（卡住不动）。
+     结算页里另有独立的「🧋 赏作者一杯奶茶」按钮负责引导打赏。 */
   restartBtn.addEventListener('click', () => {
     if (overlayEl) overlayEl.classList.remove('show');
-    gotoSponsor();
+    reset();
   });
+
+  /* 成就弹窗：点「成就」按钮打开列表；关闭按钮 / 点遮罩 / Esc 都能关。 */
+  function bindAch() {
+    if (achBtn) achBtn.addEventListener('click', () => {
+      renderAchList();
+      if (achModalEl) { achModalEl.classList.add('show'); achModalEl.setAttribute('aria-hidden', 'false'); }
+    });
+    const closeAch = () => {
+      if (achModalEl) { achModalEl.classList.remove('show'); achModalEl.setAttribute('aria-hidden', 'true'); }
+    };
+    const ac = document.getElementById('achClose'); if (ac) ac.addEventListener('click', closeAch);
+    const ao = document.getElementById('achOk');    if (ao) ao.addEventListener('click', closeAch);
+    if (achModalEl) achModalEl.addEventListener('click', (e) => { if (e.target === achModalEl) closeAch(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAch(); });
+    paintAchCount();
+  }
 
   /* ---------------------------------------------------------
    *  素材加载
@@ -1548,6 +1729,7 @@
     window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 120));
 
     paintSoundBtn();
+    bindAch();
 
     /* 越线那一屏的两个按钮 */
     if (reviveBtn) reviveBtn.addEventListener('click', revive);
@@ -1570,5 +1752,6 @@
   window.__DNW__ = { state, reset, revive, settle, gameOver, tryDrop, stepPhysics, update, FRUITS,
                      render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore,
                      MAX_BONUS, REVIVE_STEP, RESTART_MIN_SCORE, gotoSponsor, syncRestartBtn,
+                     registerCombo, unlockAchievement, computeRating, comboMult,
                      blurReady: () => !!blurImg };
 })();
