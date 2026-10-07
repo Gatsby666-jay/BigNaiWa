@@ -14,7 +14,20 @@
   const KEY = 'dnw_stamina_v1';
   const UID_KEY = 'dnw_uid';
   const DAILY = 1;                 // 每人每天体力点数
+  const CHAL_KEY = 'dnw_chal_v1';  // 挑战次数持久化键
+  const DAILY_CHAL = 5;            // 每天挑战次数（独立于体力）
   const API_BASE = (window.DNW_CONFIG && window.DNW_CONFIG.API_BASE) || '';
+
+  /* 国际化取词：I18N 缺失（离线 / 测试）时回退中文 */
+  function T(key, fallback, params) {
+    let s = null;
+    if (window.I18N && window.I18N.t) s = window.I18N.t(key, params);
+    if (s == null) s = (fallback != null ? fallback : key);
+    if (params) {
+      for (const k in params) s = String(s).split('{' + k + '}').join(String(params[k]));
+    }
+    return s;
+  }
 
   function todayStr() {
     const d = new Date();
@@ -52,9 +65,9 @@
   function render() {
     if (!labelEl) return;
     if (state.unlimited) {
-      labelEl.textContent = '♾️ 今日无限畅玩';
+      labelEl.textContent = T('stamina.unlimited', '♾️ 今日无限畅玩');
     } else {
-      labelEl.textContent = '🔋 体力 ' + state.stamina + ' / ' + DAILY;
+      labelEl.textContent = T('stamina.label', '🔋 体力 {n} / {total}', { n: state.stamina, total: DAILY });
     }
   }
 
@@ -93,6 +106,34 @@
   }
 
   function isUnlimited() { return state.unlimited; }
+
+  /* ---------------------------------------------------------
+   *  限时挑战次数：每天 5 次，独立于体力，按日重置
+   * ------------------------------------------------------- */
+
+  let chal = { date: todayStr(), left: DAILY_CHAL };
+
+  function saveChal() {
+    try { localStorage.setItem(CHAL_KEY, JSON.stringify(chal)); } catch (e) { /* ignore */ }
+  }
+  function loadChal() {
+    try {
+      const s = JSON.parse(localStorage.getItem(CHAL_KEY));
+      if (s && s.date === todayStr() && typeof s.left === 'number') { chal = s; return; }
+    } catch (e) { /* ignore */ }
+    chal = { date: todayStr(), left: DAILY_CHAL };
+    saveChal();
+  }
+  function chalEnsureToday() {
+    if (chal.date !== todayStr()) { chal = { date: todayStr(), left: DAILY_CHAL }; saveChal(); }
+  }
+  function challengeLeft() { chalEnsureToday(); return chal.left; }
+  function challengeCanStart() { chalEnsureToday(); return chal.left > 0; }
+  function challengeConsume() {
+    chalEnsureToday();
+    if (chal.left > 0) { chal.left--; saveChal(); }
+    return chal.left;
+  }
 
   /* 体力不够时：打开赞助弹窗，引导玩家真实打赏解锁 */
   function blocked() {
@@ -133,25 +174,25 @@
       payBtn.dataset.bound = '1';
       payBtn.addEventListener('click', async function () {
         if (!API_BASE) {
-          msgEl.textContent = '⚠️ 后端还没部署/配置（见 README 的 API_BASE），先用完每天 1 点体力。';
+          msgEl.textContent = T('stamina.pay.noBackend', '⚠️ 后端还没部署/配置（见 README 的 API_BASE），先用完每天 1 点体力。');
           msgEl.className = 'unlock-msg err';
           return;
         }
-        msgEl.textContent = '正在生成支付链接…';
+        msgEl.textContent = T('stamina.pay.gen', '正在生成支付链接…');
         msgEl.className = 'unlock-msg';
         try {
           const r = await fetch(API_BASE.replace(/\/$/, '') + '/api/pay-url?uid=' + encodeURIComponent(getUid()));
           const data = await r.json();
           if (data && data.url) {
             window.open(data.url, '_blank', 'noopener');
-            msgEl.textContent = '👉 已在新标签页打开爱发电，支付完成后点「我已完成支付」。';
+            msgEl.textContent = T('stamina.pay.opened', '👉 已在新标签页打开爱发电，支付完成后点「我已完成支付」。');
             msgEl.className = 'unlock-msg ok';
           } else {
-            msgEl.textContent = '生成支付链接失败：' + ((data && data.error) || '未知错误');
+            msgEl.textContent = T('stamina.pay.genFail', '生成支付链接失败：') + ((data && data.error) || T('stamina.pay.unknownError', '未知错误'));
             msgEl.className = 'unlock-msg err';
           }
         } catch (e) {
-          msgEl.textContent = '连接后端失败，稍后再试。';
+          msgEl.textContent = T('stamina.pay.connFail', '连接后端失败，稍后再试。');
           msgEl.className = 'unlock-msg err';
         }
       });
@@ -161,15 +202,15 @@
       refreshBtn.dataset.bound = '1';
       refreshBtn.addEventListener('click', async function () {
         if (!API_BASE) {
-          msgEl.textContent = '⚠️ 后端还没部署/配置，无法校验支付。';
+          msgEl.textContent = T('stamina.refresh.noBackend', '⚠️ 后端还没部署/配置，无法校验支付。');
           msgEl.className = 'unlock-msg err';
           return;
         }
-        msgEl.textContent = '正在向服务器确认…';
+        msgEl.textContent = T('stamina.refresh.checking', '正在向服务器确认…');
         msgEl.className = 'unlock-msg';
         const ok = await refreshPaid();
         if (ok) {
-          msgEl.textContent = '🎉 今日已解锁无限畅玩！';
+          msgEl.textContent = T('stamina.refresh.ok', '🎉 今日已解锁无限畅玩！');
           msgEl.className = 'unlock-msg ok';
           if (window.DanaiwaSponsor) window.DanaiwaSponsor.close();
           const dnw = window.__DNW__;
@@ -178,7 +219,7 @@
             dnw.reset();
           }
         } else {
-          msgEl.textContent = '还没查到支付记录，确认已支付后稍等几秒再点（爱发电回调可能有延迟）。';
+          msgEl.textContent = T('stamina.refresh.notFound', '还没查到支付记录，确认已支付后稍等几秒再点（爱发电回调可能有延迟）。');
           msgEl.className = 'unlock-msg err';
         }
       });
@@ -194,10 +235,18 @@
     blocked: blocked,
     render: render,
     isUnlimited: isUnlimited,
-    getUid: getUid
+    getUid: getUid,
+    challengeLeft: challengeLeft,
+    challengeCanStart: challengeCanStart,
+    challengeConsume: challengeConsume,
+    DAILY_CHAL: DAILY_CHAL
   };
 
+  /* 切换语言后刷新体力条文案 */
+  if (window.I18N && window.I18N.onChange) window.I18N.onChange(render);
+
   load();
+  loadChal();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
   else mount();
 
