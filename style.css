@@ -446,6 +446,65 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .combo-badge.pop { animation: none; } }
 
+/* 挑战模式倒计时：顶部信息条里的一条胶囊（不遮棋盘） */
+.challenge-hud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 9px 12px;
+  border-radius: 16px;
+  font-size: 17px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  background: linear-gradient(135deg, #4aa8ff, #2f6bff 60%, #6a3bff);
+  box-shadow: 0 6px 18px rgba(47, 107, 255, .34), inset 0 1px 0 rgba(255, 255, 255, .38);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.challenge-hud .ch-ico  { font-size: 14px; }
+.challenge-hud .ch-unit { font-size: 12px; opacity: .88; font-weight: 700; }
+.challenge-hud.low {
+  background: linear-gradient(135deg, #ff6b6b, #e8302f 60%, #b3121f);
+  box-shadow: 0 6px 18px rgba(232, 48, 47, .48), inset 0 1px 0 rgba(255, 255, 255, .38);
+  animation: chPulse .9s ease-in-out infinite;
+}
+@keyframes chPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.09); }
+}
+@media (prefers-reduced-motion: reduce) { .challenge-hud.low { animation: none; } }
+
+/* 挑战弹窗正文 */
+.challenge-body { margin-bottom: 4px; }
+.challenge-rules {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--ink-soft);
+}
+.challenge-rules strong { color: #2f6bff; }
+.challenge-remain {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  text-align: center;
+  color: var(--ink);
+  background: rgba(74, 168, 255, .12);
+  box-shadow: inset 0 0 0 1px rgba(74, 168, 255, .25);
+}
+.challenge-remain strong { color: #2f6bff; font-variant-numeric: tabular-nums; }
+
+/* 结算页「再挑战」次数用完时置灰 */
+#restartBtn:disabled {
+  opacity: .55;
+  filter: grayscale(.75);
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* 结算评级 */
 .rating-wrap { margin: 0 0 16px; }
 .rating {
@@ -569,6 +628,7 @@ body {
 }
 
 .btn .ico { margin-right: 4px; }
+.btn .badge { margin-left: 4px; font-size: 12px; opacity: .8; font-variant-numeric: tabular-nums; }
 
 .btn:hover  { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(140, 96, 56, .2); }
 .btn:active { transform: translateY(1px) scale(.985); }
@@ -1054,6 +1114,9 @@ body {
     width: 100%;
   }
 
+  /* 手机上按钮变多（7 个），不再让「排行榜」整行占满 → 排两行（4 + 3）更省高度 */
+  #boardBtn { grid-column: auto; }
+
   /* 触摸目标够大；文字允许换行，窄屏也不被挤掉 */
   .btn {
     min-height: 48px;
@@ -1061,20 +1124,29 @@ body {
     font-size: 13px;
     border-radius: 13px;
     white-space: normal;
+    overflow-wrap: anywhere;   /* 长英文单词兜底：宁可换行也不被裁掉 */
     line-height: 1.15;
     text-align: center;
   }
 
-  /* 手机上「排行榜 / 音效」只留图标，把横向空间让给分数 */
+  /* 手机上按钮变多，除「重开 / 语言」外一律只留图标，
+     免得长英文单词（Challenge / Support）被挤掉或撑破按钮。
+     「成就」保留数字徽章（🏆 0/8）。 */
   #boardBtn .lbl,
-  #soundBtn .lbl { display: none; }
+  #soundBtn .lbl,
+  #achBtn .lbl,
+  #challengeBtn .lbl,
+  #sponsorBtnHome .lbl { display: none; }
 
-  #boardBtn, #soundBtn {
-    font-size: 18px;
+  #boardBtn, #soundBtn, #achBtn, #challengeBtn, #sponsorBtnHome {
+    font-size: 16px;
     padding: 6px 4px;
   }
 
-  #boardBtn .ico, #soundBtn .ico { margin-right: 0; }
+  #boardBtn .ico, #soundBtn .ico, #achBtn .ico,
+  #challengeBtn .ico, #sponsorBtnHome .ico { margin-right: 0; }
+
+  #achBtn .badge { margin-left: 3px; font-size: 12px; }
 
   /* ---- 结束弹窗 ---- */
   .overlay { padding: 14px; }
@@ -1126,7 +1198,8 @@ body {
 
   .stats { grid-template-columns: 1fr; flex: 0 0 auto; }
 
-  .actions { grid-template-columns: 1fr; }
+  /* 横屏时按钮变成 7 个，竖排会顶破面板 → 排成两列 */
+  .actions { grid-template-columns: 1fr 1fr; }
 
   .stage {
     height: calc(var(--vh) - 16px - var(--safe-t) - var(--safe-b));
@@ -1151,6 +1224,8 @@ body {
   .btn { min-height: 44px; padding: 0 10px; font-size: 13px; }
 
   #boardBtn, #soundBtn { min-width: 42px; font-size: 16px; }
+
+  .challenge-hud { font-size: 15px; padding: 7px 10px; }
 }
 
 /* 顶部信息条在横屏下是竖排的，恢复成图标 + 文字 */
