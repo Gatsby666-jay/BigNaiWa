@@ -35,7 +35,7 @@
 
     <!-- 连击提示：窗口内连续合成时浮在棋盘顶部中央，纯展示、不挡操作 -->
     <div class="combo-badge" id="comboBadge" hidden>
-      <span class="combo-fire">🔥</span> 连击 <span id="comboNum">2</span><span id="comboMult" class="combo-mult"></span>
+      <span class="combo-fire">🔥</span> <span data-i18n="combo.word">连击</span> <span id="comboNum">2</span><span id="comboMult" class="combo-mult"></span>
     </div>
 
     <!-- 复活币：浮在棋盘左上角。
@@ -52,22 +52,23 @@
         <!-- ===== 越线第一屏：有复活币时才出现 ===== -->
         <div class="revive-ask" id="revivePrompt" hidden>
           <div class="dialog-emoji">😵</div>
-          <h2>还能再救一下</h2>
-          <p class="dialog-score">本局得分 <strong id="reviveScore">0</strong></p>
-          <p class="revive-hint">清掉警戒线以上的水果，接着玩</p>
+          <h2 data-i18n="revive.title">还能再救一下</h2>
+          <p class="dialog-score"><span data-i18n="revive.score">本局得分</span> <strong id="reviveScore">0</strong></p>
+          <p class="revive-hint" data-i18n="revive.hint">清掉警戒线以上的水果，接着玩</p>
           <div class="dialog-actions">
-            <button class="btn" id="giveUpBtn" type="button">不了，结束吧</button>
-            <button class="btn btn-revive" id="reviveBtn" type="button">🪙 用一枚复活币</button>
+            <button class="btn" id="giveUpBtn" type="button" data-i18n="revive.giveup">不了，结束吧</button>
+            <button class="btn btn-revive" id="reviveBtn" type="button" data-i18n="revive.use">🪙 用一枚复活币</button>
           </div>
-          <p class="dialog-hint" id="reviveLeft">还剩 1 枚</p>
+          <p class="dialog-hint" id="reviveLeft"></p>
         </div>
 
         <!-- ===== 第二屏：正式结算 ===== -->
         <div id="overPanel">
           <div class="dialog-emoji">🍉</div>
-          <h2 id="overTitle">游戏结束</h2>
-          <p class="dialog-score">本局得分 <strong id="finalScore">0</strong></p>
-          <p class="dialog-best">最高分 <span id="finalBest">0</span></p>
+          <h2 id="overTitle" data-i18n="over.title">游戏结束</h2>
+          <p class="dialog-score"><span data-i18n="over.score">本局得分</span> <strong id="finalScore">0</strong></p>
+          <p class="dialog-best"><span data-i18n="over.best">最高分</span> <span id="finalBest">0</span></p>
+          <p class="dialog-best" id="challengeLine" hidden></p>
 
           <div class="rating-wrap">
             <div class="rating" id="ratingEl"></div>
@@ -75,19 +76,19 @@
           </div>
 
           <div class="submit-box" id="submitBox">
-            <p class="submit-msg" id="submitMsg">正在结算…</p>
-            <p class="my-name">昵称：<strong id="myNameLabel">默认用户</strong>
-              <button class="link-btn" id="editNameBtn" type="button">改昵称</button>
+            <p class="submit-msg" id="submitMsg" data-i18n="submit.init">正在结算…</p>
+            <p class="my-name"><span data-i18n="over.nick">昵称：</span><strong id="myNameLabel" data-i18n="lb.defaultUser">默认用户</strong>
+              <button class="link-btn" id="editNameBtn" type="button" data-i18n="over.editname">改昵称</button>
             </p>
-            <button class="btn" id="submitBtn" type="button" hidden>重试提交</button>
+            <button class="btn" id="submitBtn" type="button" hidden data-i18n="lb.retry">重试提交</button>
           </div>
 
           <div class="dialog-actions">
-            <button class="btn" id="boardBtn2" type="button">🏆 排行榜</button>
-            <button class="btn btn-primary" id="restartBtn" type="button">再来一局</button>
-            <button class="btn btn-sponsor btn-wide" id="sponsorBtn" type="button">🧋 可以赏作者一杯奶茶嘛</button>
+            <button class="btn" id="boardBtn2" type="button"><span class="ico">🏆</span><span class="lbl" data-i18n="btn.board.label">排行榜</span></button>
+            <button class="btn btn-primary" id="restartBtn" type="button" data-i18n="over.again">再来一局</button>
+            <button class="btn btn-sponsor btn-wide" id="sponsorBtn" type="button"><span class="ico">🧋</span><span class="lbl" data-i18n="over.sponsor">可以赏作者一杯奶茶嘛</span></button>
           </div>
-          <p class="dialog-hint">按 R 键也可重新开始</p>
+          <p class="dialog-hint" data-i18n="over.hint">按 R 键也可重新开始</p>
         </div>
 
       </div>
@@ -98,55 +99,68 @@
   <aside class="panel">
 
     <header class="panel-head">
-      <h1>合成大奶long</h1>
-      <p class="subtitle">相同的撞在一起，越合越大</p>
+      <h1 data-i18n="app.h1">合成大奶long</h1>
+      <p class="subtitle" data-i18n="app.subtitle">相同的撞在一起，越合越大</p>
     </header>
 
     <div class="stats">
       <div class="stat">
-        <span class="stat-label">分数</span>
+        <span class="stat-label" data-i18n="stat.score">分数</span>
         <strong class="stat-value" id="score">0</strong>
       </div>
       <div class="stat">
-        <span class="stat-label">最高分</span>
+        <span class="stat-label" data-i18n="stat.best">最高分</span>
         <strong class="stat-value stat-best" id="best">0</strong>
       </div>
     </div>
 
+    <!-- 挑战模式倒计时：只在挑战模式显示。放在顶部信息条里，
+         不会像浮在棋盘上那样遮住「下一个」预览或落点。 -->
+    <div class="challenge-hud" id="challengeHud" hidden>
+      <span class="ch-ico" aria-hidden="true">⏱</span><span id="challengeTime">60</span><span class="ch-unit">s</span>
+    </div>
+
     <div class="next-box">
-      <span class="box-label">下一个</span>
+      <span class="box-label" data-i18n="label.next">下一个</span>
       <canvas id="next" width="160" height="160" aria-label="下一个"></canvas>
     </div>
 
     <div class="chain-box">
-      <span class="box-label">合成表</span>
+      <span class="box-label" data-i18n="label.chain">合成表</span>
       <canvas id="chain" width="680" height="112" aria-label="合成顺序"></canvas>
-      <p class="chain-note">✨ 两个神奶蛙撞在一起会一起炸掉，换 <strong>500 分</strong> + <strong>一枚复活币</strong></p>
+      <p class="chain-note" data-i18n-html="chain.note">✨ 两个神奶蛙撞在一起会一起炸掉，换 <strong>500 分</strong> + <strong>一枚复活币</strong></p>
     </div>
 
     <div class="actions">
       <button class="btn btn-wide" id="boardBtn" type="button">
-        <span class="ico">🏆</span><span class="lbl">排行榜</span>
+        <span class="ico">🏆</span><span class="lbl" data-i18n="btn.board.label">排行榜</span>
       </button>
       <button class="btn" id="soundBtn" type="button" aria-pressed="true">
-        <span class="ico">🔊</span><span class="lbl">音效开</span>
+        <span class="ico">🔊</span><span class="lbl" data-i18n="btn.sound.on">音效开</span>
       </button>
       <button class="btn btn-primary" id="resetBtn" type="button" title="重新开始">
-        <span class="ico">↻</span><span class="lbl">重开</span>
+        <span class="ico">↻</span><span class="lbl" data-i18n="btn.reset">重开</span>
       </button>
       <button class="btn btn-sponsor" id="sponsorBtnHome" type="button" title="赞助作者">
-        <span class="ico">🧋</span><span class="lbl">赞助作者</span>
+        <span class="ico">🧋</span><span class="lbl" data-i18n="btn.sponsor.label">赞助作者</span>
       </button>
       <button class="btn" id="achBtn" type="button" title="我的成就">
-        <span class="ico">🏆</span><span class="lbl">成就 <span id="achCount">0/8</span></span>
+        <span class="ico">🏆</span><span class="lbl" data-i18n="btn.ach.label">成就</span><span class="badge" id="achCount">0/8</span>
+      </button>
+      <button class="btn" id="challengeBtn" type="button" title="限时挑战">
+        <span class="ico">⏱</span><span class="lbl" data-i18n="btn.challenge.label">挑战</span>
+      </button>
+      <button class="btn" id="langBtn" type="button" title="切换语言 / Language">
+        <span class="ico">🌐</span><span class="lbl">EN</span>
       </button>
     </div>
 
-    <p class="tips">
+    <p class="tips" data-i18n-html="tips">
       鼠标：移动瞄准、点击投放；触屏：拖动瞄准、松手投放。<br>
       ← → 微调位置，空格投放，R 重开。<br>
       每 <strong>2000 分</strong>攒一枚<strong>复活币</strong>，只在本局有效。<br>
-      每天 <strong>1 点体力</strong>，开一局扣 1 点；体力用完可<strong>打赏作者</strong>解锁今日无限畅玩。
+      每天 <strong>1 点体力</strong>，开一局扣 1 点；体力用完可<strong>打赏作者</strong>解锁今日无限畅玩。<br>
+      ⏱ 限时挑战：<strong>每天 5 次</strong>，60 秒内尽情冲分。
     </p>
 
   </aside>
@@ -157,18 +171,19 @@
 <div class="modal" id="boardModal" aria-hidden="true" role="dialog" aria-label="排行榜">
   <div class="modal-card">
     <header class="modal-head">
-      <h2>🏆 最近高手榜</h2>
-      <button class="icon-btn" id="boardClose" type="button" aria-label="关闭">✕</button>
+      <h2 data-i18n="board.title">🏆 最近高手榜</h2>
+      <button class="icon-btn" id="boardClose" type="button" aria-label="关闭" data-i18n-attr="aria-label:common.close">✕</button>
     </header>
     <div class="nick-row">
-      <label class="nick-label" for="nickInput">我的昵称</label>
+      <label class="nick-label" for="nickInput" data-i18n="board.nick">我的昵称</label>
       <input class="nick-input" id="nickInput" type="text" maxlength="12"
-             placeholder="默认用户" autocomplete="nickname" enterkeyhint="done">
+             placeholder="默认用户" autocomplete="nickname" enterkeyhint="done"
+             data-i18n-attr="placeholder:board.nickPh">
     </div>
     <div class="board-list" id="boardList"></div>
     <footer class="modal-foot">
-      <span class="board-note">只取最近 20 次提交，成绩会被后来的人挤下去</span>
-      <button class="btn" id="boardRefresh" type="button">刷新</button>
+      <span class="board-note" data-i18n="board.note">只取最近 20 次提交，成绩会被后来的人挤下去</span>
+      <button class="btn" id="boardRefresh" type="button" data-i18n="board.refresh">刷新</button>
     </footer>
   </div>
 </div>
@@ -177,38 +192,38 @@
 <div class="modal" id="sponsorModal" aria-hidden="true" role="dialog" aria-label="赞助作者">
   <div class="modal-card">
     <header class="modal-head">
-      <h2>🧋 请作者喝杯奶茶</h2>
-      <button class="icon-btn" id="sponsorClose" type="button" aria-label="关闭">✕</button>
+      <h2 data-i18n="sponsor.title">🧋 请作者喝杯奶茶</h2>
+      <button class="icon-btn" id="sponsorClose" type="button" aria-label="关闭" data-i18n-attr="aria-label:common.close">✕</button>
     </header>
     <div class="sponsor-body">
-      <p class="sponsor-note">这游戏完全免费，也没有任何广告。<br>
+      <p class="sponsor-note" data-i18n-html="sponsor.note">这游戏完全免费，也没有任何广告。<br>
         要是它逗你笑了一下，赏作者一杯奶茶呗 🧋</p>
       <!-- 两个收款码并排：grid 自适应，窄屏自动堆叠不横向溢出 -->
       <div class="qr-row">
         <figure class="qr-item">
           <img class="sponsor-qr" src="assets/sponsor-qr.webp" width="450" height="441"
                alt="支付宝收款码" loading="lazy" decoding="async">
-          <figcaption class="qr-cap">支付宝扫码打赏</figcaption>
+          <figcaption class="qr-cap" data-i18n="sponsor.qrAlipay">支付宝扫码打赏</figcaption>
         </figure>
         <figure class="qr-item">
           <img class="sponsor-qr" src="assets/sponsor-qr2.webp" width="445" height="450"
                alt="微信收款码" loading="lazy" decoding="async">
-          <figcaption class="qr-cap">微信扫码打赏</figcaption>
+          <figcaption class="qr-cap" data-i18n="sponsor.qrWechat">微信扫码打赏</figcaption>
         </figure>
       </div>
-      <p class="sponsor-hint">🟢 支付宝 / 微信扫码也能打赏（随心意，不解锁）；想<strong>解锁今日无限畅玩</strong>、杜绝白嫖，请走下方爱发电 ↓</p>
+      <p class="sponsor-hint" data-i18n-html="sponsor.hint">🟢 支付宝 / 微信扫码也能打赏（随心意，不解锁）；想<strong>解锁今日无限畅玩</strong>、杜绝白嫖，请走下方爱发电 ↓</p>
       <div class="unlock-box">
-        <p class="unlock-tip">体力用完想继续玩？<strong>真实打赏后</strong>今日即可无限畅玩（由后端校验，无法白嫖）：</p>
+        <p class="unlock-tip" data-i18n-html="sponsor.unlockTip">体力用完想继续玩？<strong>真实打赏后</strong>今日即可无限畅玩（由后端校验，无法白嫖）：</p>
         <div class="unlock-row">
-          <button class="btn btn-unlock" id="sponsorPayBtn" type="button">去打赏（爱发电）</button>
-          <button class="btn" id="sponsorRefreshBtn" type="button">我已完成支付</button>
+          <button class="btn btn-unlock" id="sponsorPayBtn" type="button" data-i18n="sponsor.pay">去打赏（爱发电）</button>
+          <button class="btn" id="sponsorRefreshBtn" type="button" data-i18n="sponsor.refresh">我已完成支付</button>
         </div>
         <p class="unlock-msg" id="sponsorPayMsg" role="status" aria-live="polite"></p>
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="board-note">谢谢每一位投喂的玩家 ❤️</span>
-      <button class="btn" id="sponsorOk" type="button">关闭</button>
+      <span class="board-note" data-i18n="sponsor.foot">谢谢每一位投喂的玩家 ❤️</span>
+      <button class="btn" id="sponsorOk" type="button" data-i18n="sponsor.close">关闭</button>
     </footer>
   </div>
 </div>
@@ -217,13 +232,31 @@
 <div class="modal" id="achModal" aria-hidden="true" role="dialog" aria-label="成就">
   <div class="modal-card">
     <header class="modal-head">
-      <h2>🏆 我的成就</h2>
-      <button class="icon-btn" id="achClose" type="button" aria-label="关闭">✕</button>
+      <h2 data-i18n="ach.title">🏆 我的成就</h2>
+      <button class="icon-btn" id="achClose" type="button" aria-label="关闭" data-i18n-attr="aria-label:common.close">✕</button>
     </header>
     <div class="ach-list" id="achList"></div>
     <footer class="modal-foot">
-      <span class="board-note">达成成就，记录你的奶龙之路</span>
-      <button class="btn" id="achOk" type="button">关闭</button>
+      <span class="board-note" data-i18n="ach.note">达成成就，记录你的奶龙之路</span>
+      <button class="btn" id="achOk" type="button" data-i18n="ach.close">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ===== 限时挑战弹窗 ===== -->
+<div class="modal" id="challengeModal" aria-hidden="true" role="dialog" aria-label="限时挑战">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 data-i18n="challenge.title">⏱ 限时挑战</h2>
+      <button class="icon-btn" id="challengeClose" type="button" aria-label="关闭" data-i18n-attr="aria-label:common.close">✕</button>
+    </header>
+    <div class="challenge-body">
+      <p class="challenge-rules" data-i18n-html="challenge.rules">60 秒内尽可能拿高分！</p>
+      <p class="challenge-remain" id="challengeRemain"></p>
+    </div>
+    <footer class="modal-foot">
+      <span class="board-note" data-i18n="challenge.footNote">每次挑战 60 秒，消耗当天 1 次机会</span>
+      <button class="btn btn-primary" id="challengeStart" type="button">开始挑战</button>
     </footer>
   </div>
 </div>
@@ -231,9 +264,16 @@
 <!-- 成就解锁提示（浮在页面顶部中央，自动消失） -->
 <div class="ach-toast" id="achToast" hidden>
   <span class="ach-toast-ico" id="achToastIco">🏆</span>
-  <span class="ach-toast-text">解锁成就：<strong id="achToastName">名称</strong></span>
+  <span class="ach-toast-text"><span data-i18n="ach.toastPrefix">解锁成就：</span><strong id="achToastName">名称</strong></span>
 </div>
 
+<!-- ===== 脚本 =====
+     顺序很重要：
+     1) i18n.js 最先 —— 其它模块运行时要取词；
+     2) sponsor.js 必须在 game.js 之前（首次进入体力耗尽时 boot() 会调 blocked()）；
+     3) game.js 放最后，确保上面的模块都已就绪。 -->
+<!-- 国际化（中/英，必须在最前） -->
+<script src="i18n.js"></script>
 <!-- 碰撞形状数据（按贴图轮廓自动生成，由 tools/build_parts.py 产出） -->
 <script src="assets/fruits/parts.js"></script>
 <!-- 极模糊占位图（内联 data URL，由 tools/make_blur.py 产出）：贴图没到位时先画它 -->
@@ -243,9 +283,7 @@
 <script src="stamina.js"></script>
 <!-- 排行榜 -->
 <script src="leaderboard.min.js"></script>
-<!-- 赞助作者：必须在 game.js 之前加载。
-     否则首次进入若当天体力已耗尽，boot() 调 reset()→blocked() 时
-     window.DanaiwaSponsor 还没定义，弹窗打不开、棋盘却被锁死 → 看起来像“画面卡住”。 -->
+<!-- 赞助作者：必须在 game.js 之前加载。 -->
 <script src="sponsor.js"></script>
 <!-- 游戏主逻辑（放最后，确保上面的模块都已就绪） -->
 <script src="game.js"></script>
