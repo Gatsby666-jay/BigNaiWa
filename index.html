@@ -12,6 +12,15 @@
 <!-- ↓ Monetag 站点验证：把后台给的 meta 标签粘在下面这一行 ↓ -->
 
 <title>合成大奶long</title>
+<!-- 首屏立刻用到的 7 张水果贴图：提前并行预取，缩短「进去」的等待。
+     高段大图仍在 game.js 里按 requestIdleCallback 延迟补，不抢首屏带宽。 -->
+<link rel="preload" as="image" href="assets/fruits/01-grape.webp">
+<link rel="preload" as="image" href="assets/fruits/02-cherry.webp">
+<link rel="preload" as="image" href="assets/fruits/03-orange.webp">
+<link rel="preload" as="image" href="assets/fruits/04-lemon.webp">
+<link rel="preload" as="image" href="assets/fruits/05-kiwi.webp">
+<link rel="preload" as="image" href="assets/fruits/06-tomato.webp">
+<link rel="preload" as="image" href="assets/fruits/07-peach.webp">
 <!-- 内联 SVG 图标：省一次 favicon.ico 请求，也免掉 404 噪音 -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E🍉%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
