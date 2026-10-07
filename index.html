@@ -33,6 +33,11 @@
   <section class="stage" id="stage">
     <canvas id="game" aria-label="合成大奶long游戏区域"></canvas>
 
+    <!-- 连击提示：窗口内连续合成时浮在棋盘顶部中央，纯展示、不挡操作 -->
+    <div class="combo-badge" id="comboBadge" hidden>
+      <span class="combo-fire">🔥</span> 连击 <span id="comboNum">2</span><span id="comboMult" class="combo-mult"></span>
+    </div>
+
     <!-- 复活币：浮在棋盘左上角。
          刻意不放进顶部信息条 —— 手机上面板是横向 flex，
          多一个卡片会把「分数 / 最高分」挤到 52px 宽还折行（实测面板从 66px 涨到 102px）。
@@ -63,6 +68,11 @@
           <h2 id="overTitle">游戏结束</h2>
           <p class="dialog-score">本局得分 <strong id="finalScore">0</strong></p>
           <p class="dialog-best">最高分 <span id="finalBest">0</span></p>
+
+          <div class="rating-wrap">
+            <div class="rating" id="ratingEl"></div>
+            <p class="rating-txt" id="ratingTxt"></p>
+          </div>
 
           <div class="submit-box" id="submitBox">
             <p class="submit-msg" id="submitMsg">正在结算…</p>
@@ -126,6 +136,9 @@
       </button>
       <button class="btn btn-sponsor" id="sponsorBtnHome" type="button" title="赞助作者">
         <span class="ico">🧋</span><span class="lbl">赞助作者</span>
+      </button>
+      <button class="btn" id="achBtn" type="button" title="我的成就">
+        <span class="ico">🏆</span><span class="lbl">成就 <span id="achCount">0/8</span></span>
       </button>
     </div>
 
@@ -198,6 +211,27 @@
       <button class="btn" id="sponsorOk" type="button">关闭</button>
     </footer>
   </div>
+</div>
+
+<!-- ===== 成就弹窗 ===== -->
+<div class="modal" id="achModal" aria-hidden="true" role="dialog" aria-label="成就">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2>🏆 我的成就</h2>
+      <button class="icon-btn" id="achClose" type="button" aria-label="关闭">✕</button>
+    </header>
+    <div class="ach-list" id="achList"></div>
+    <footer class="modal-foot">
+      <span class="board-note">达成成就，记录你的奶龙之路</span>
+      <button class="btn" id="achOk" type="button">关闭</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 成就解锁提示（浮在页面顶部中央，自动消失） -->
+<div class="ach-toast" id="achToast" hidden>
+  <span class="ach-toast-ico" id="achToastIco">🏆</span>
+  <span class="ach-toast-text">解锁成就：<strong id="achToastName">名称</strong></span>
 </div>
 
 <!-- 碰撞形状数据（按贴图轮廓自动生成，由 tools/build_parts.py 产出） -->
