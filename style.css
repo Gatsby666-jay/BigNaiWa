@@ -76,6 +76,9 @@ body {
   overflow: hidden;
   cursor: pointer;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* 手机上长按棋盘别弹出「保存图片」菜单，干扰瞄准 */
+  overscroll-behavior: contain;  /* 拖拽时不要把整页一起拉（下拉刷新 / 橡皮筋） */
   touch-action: none;
   box-shadow:
     0 26px 64px rgba(122, 80, 40, .30),
