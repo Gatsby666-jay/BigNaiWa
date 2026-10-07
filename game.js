@@ -211,6 +211,12 @@
 
   const view = { scale: 1, dpr: 1 };
 
+  /* 尊重「减少动态效果」的系统偏好：关掉屏幕震动这类容易让人不适的强动效
+     （水果挤压、飘字等核心反馈保留）。 */
+  const REDUCED_MOTION =
+    typeof window !== 'undefined' && window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   function resizeCanvas() {
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
@@ -246,7 +252,10 @@
     revives: 0,        // 本局还剩几枚复活币（重开清零）
     reviveGiven: 0,    // 本局已经发放过几次（用来判断跨过新的 2000 分）
     freeze: 0,         // 命中定格剩余秒数
-    locked: false      // 体力/解锁未通过时锁死棋盘，禁止投放（防退出重进白嫖）
+    locked: false,     // 体力/解锁未通过时锁死棋盘，禁止投放（防退出重进白嫖）
+    bestBeaten: false, // 本局是否已经刷新过最高分（用于只庆祝一次）
+    ballsVersion: 0,   // 棋盘水果列表变更计数：渲染层靠它判断是否需要重排序
+    shake: 0           // 屏幕震动剩余强度（px），仅影响绘制偏移，不改物理/坐标
   };
 
   /* ---------------------------------------------------------
@@ -264,6 +273,13 @@
     if (s && s.parts && s.parts.length) return s;
     return UNIT_SHAPE;
   }
+
+  /* 每级的瞄准边界只取决于「半径 × 碰撞外形」，是常数。提前算好，
+     避免 moveAim / tryDrop / drawAim 每帧都重算（虽然便宜，但一局里会被调很多次）。 */
+  const AIM_LIMITS = FRUITS.map((f, i) => {
+    const r = f.r * shapeOf(i).rb;
+    return [WALL + r + 0.5, W - WALL - r - 0.5];
+  });
 
   /* 把局部小圆换算到世界坐标（跟着刚体一起旋转平移） */
   function syncParts(b) {
@@ -305,6 +321,10 @@
     syncParts(ball);
     return ball;
   }
+
+  /* 棋盘水果列表发生增删时调用：让渲染层在下一次绘制时重排序，
+     而不是每一帧都 slice + sort（一局后期上百颗球时省掉不少分配与排序）。 */
+  function bumpBalls() { state.ballsVersion++; }
 
   /* ---------------------------------------------------------
    *  物理
@@ -548,6 +568,7 @@
         haptic(70);
         state.flash = 1.4;                    // 比普通合成更亮的全屏闪
         state.freeze = FREEZE_MS / 1000;      // 定格一下，让这一下有重量
+        state.shake = Math.max(state.shake, 11);   // 神奶蛙炸场：来一下屏幕震动
         state.floats.push({ x: mx, y: my - 74, text: '两个神奶蛙 💥', life: 1.6 });
         state.floats.push({ x: mx, y: my - 16, text: '+' + MAX_BONUS, life: 2.2, big: true });
         if (MAX_MERGE_GIVES_REVIVE) {
@@ -565,6 +586,7 @@
         nb.landed = true;
         nb.popAt = performance.now();
         state.balls.push(nb);
+        bumpBalls();
 
         addScore(MERGE_SCORE[nt], mx, my, '+' + MERGE_SCORE[nt]);
         burst(mx, my, nt, 8 + nt * 2, 140 + nt * 22);
@@ -580,6 +602,7 @@
       if (!state.balls[i].dead) alive.push(state.balls[i]);
     }
     state.balls = alive;
+    bumpBalls();
   }
 
   /* ---------------------------------------------------------
@@ -679,6 +702,10 @@
       state.best = state.score;
       localStorage.setItem(BEST_KEY, String(state.best));
       bestEl.textContent = state.best;
+      if (!state.bestBeaten) {            // 本局第一次刷新纪录时，让「最高分」跳一下
+        state.bestBeaten = true;
+        bump(bestEl);
+      }
     }
     scoreEl.textContent = state.score;
     bump(scoreEl);
@@ -699,10 +726,7 @@
    *  投放 & 控制
    * ------------------------------------------------------- */
 
-  function aimLimit(tier) {
-    const r = FRUITS[tier].r * shapeOf(tier).rb;   // 用碰撞外形而不是圆形
-    return [WALL + r + 0.5, W - WALL - r - 0.5];
-  }
+  function aimLimit(tier) { return AIM_LIMITS[tier]; }
 
   function moveAim(x) {
     const [lo, hi] = aimLimit(state.pending);
@@ -721,6 +745,7 @@
 
     const ball = makeBall(x, DROP_Y, tier, 0, 130);
     state.balls.push(ball);
+    bumpBalls();
 
     state.ready = false;
     state.cooldown = DROP_MS / 1000;
@@ -811,6 +836,7 @@
 
     /* 越线计时清零，给玩家一个反应窗口 */
     for (let i = 0; i < state.balls.length; i++) state.balls[i].overTime = 0;
+    bumpBalls();
 
     state.revives--;
     state.over = false;
@@ -818,6 +844,7 @@
     state.ready = true;
     state.cooldown = 0;
     state.flash = 0.6;               // 闪一下，让玩家知道救回来了
+    state.shake = Math.max(state.shake, 8);   // 复活那一下也带点震动
     if (revivePromptEl) revivePromptEl.hidden = true;
     if (overlayEl) overlayEl.classList.remove('show');
     paintRevives(false);
@@ -849,6 +876,9 @@
     state.cooldown = 0;
     state.flash = 0;
     state.danger = false;
+    state.bestBeaten = false;       // 新一局允许再次庆祝「新纪录」
+    state.shake = 0;
+    bumpBalls();                    // 棋盘已清空，刷新绘制顺序缓存
     state.aimX = W / 2;
     state.revives = 0;        // 复活币只在本局有效，重开清零
     state.reviveGiven = 0;
@@ -994,20 +1024,26 @@
     c.restore();
   }
 
+  /* 棋盘背景 / 顶部高光是固定渐变，建一次缓存，避免每帧 new 两个 Gradient 对象
+     （一局 60fps 下每秒就是 120 次无谓分配 + GC 压力）。 */
+  let _boardBg = null, _boardTop = null;
+
   function drawBoard() {
     /* 背景 */
-    const bg = ctx.createLinearGradient(0, 0, 0, H);
-    bg.addColorStop(0, '#fffaf0');
-    bg.addColorStop(0.55, '#fff2dc');
-    bg.addColorStop(1, '#ffe7c6');
-    ctx.fillStyle = bg;
+    if (!_boardBg) {
+      _boardBg = ctx.createLinearGradient(0, 0, 0, H);
+      _boardBg.addColorStop(0, '#fffaf0');
+      _boardBg.addColorStop(0.55, '#fff2dc');
+      _boardBg.addColorStop(1, '#ffe7c6');
+      _boardTop = ctx.createLinearGradient(0, 0, 0, 190);
+      _boardTop.addColorStop(0, 'rgba(255,255,255,.85)');
+      _boardTop.addColorStop(1, 'rgba(255,255,255,0)');
+    }
+    ctx.fillStyle = _boardBg;
     ctx.fillRect(0, 0, W, H);
 
     /* 顶部投放区高光 */
-    const top = ctx.createLinearGradient(0, 0, 0, 190);
-    top.addColorStop(0, 'rgba(255,255,255,.85)');
-    top.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = top;
+    ctx.fillStyle = _boardTop;
     ctx.fillRect(0, 0, W, 190);
 
     /* 内壁阴影 */
@@ -1037,23 +1073,38 @@
     ctx.restore();
   }
 
+  /* 绘制顺序缓存：水果按半径从小到大画（小的在后、大的在前，叠加更自然）。
+     只在「棋盘列表真的变了」时才重排，平时直接复用缓存数组。 */
+  let drawOrder = [];
+  let drawOrderVer = -1;
+
   function drawBalls() {
     const now = performance.now();
     const balls = state.balls;
-    const sorted = balls.slice().sort((a, b) => a.r - b.r);
+    if (drawOrderVer !== state.ballsVersion) {
+      drawOrderVer = state.ballsVersion;
+      drawOrder = balls.slice().sort((a, b) => a.r - b.r);
+    }
 
-    for (let i = 0; i < sorted.length; i++) {
-      const b = sorted[i];
+    /* 地面投影：一次性画进同一条路径、只填一次，省掉每颗球一次
+       save/restore + fill（一局后期上百颗球时减少大量状态切换与绘制调用）。 */
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = '#7a4a1e';
+    ctx.beginPath();
+    for (let i = 0; i < drawOrder.length; i++) {
+      const b = drawOrder[i];
       if (b.dead) continue;
+      const rx = b.r * 0.86, ry = Math.max(3, b.r * 0.17);
+      ctx.moveTo(b.x + rx, H - WALL - 1);
+      ctx.ellipse(b.x, H - WALL - 1, rx, ry, 0, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.restore();
 
-      /* 地面投影 */
-      ctx.save();
-      ctx.globalAlpha = 0.16;
-      ctx.fillStyle = '#7a4a1e';
-      ctx.beginPath();
-      ctx.ellipse(b.x, H - WALL - 1, b.r * 0.86, Math.max(3, b.r * 0.17), 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+    for (let i = 0; i < drawOrder.length; i++) {
+      const b = drawOrder[i];
+      if (b.dead) continue;
 
       let scale = 1;
       if (b.popAt) {
@@ -1271,11 +1322,19 @@
 
     checkGameOver(dt);
     if (state.flash > 0) state.flash = Math.max(0, state.flash - dt * 2.2);
+    if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 60);  // 震动衰减
   }
 
   function render(dt) {
     ctx.setTransform(view.scale, 0, 0, view.scale, 0, 0);
-    ctx.clearRect(0, 0, W, H);
+    /* 多清一圈：震动会把整块画面平移几像素，多清一点免得上一帧的残影留在边缘 */
+    ctx.clearRect(-16, -16, W + 32, H + 32);
+
+    /* 屏幕震动：纯渲染位移，所有绘制都跟着抖，但不影响任何坐标/物理计算。
+       用户若开启「减少动态效果」则跳过（无障碍）。 */
+    if (state.shake > 0.4 && !REDUCED_MOTION) {
+      ctx.translate(rand(-state.shake, state.shake), rand(-state.shake, state.shake));
+    }
 
     drawBoard();
     drawBalls();
@@ -1287,7 +1346,7 @@
       ctx.save();
       ctx.globalAlpha = state.flash * 0.35;
       ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(-16, -16, W + 32, H + 32);
       ctx.restore();
     }
   }
