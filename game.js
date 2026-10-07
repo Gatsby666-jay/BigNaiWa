@@ -753,6 +753,12 @@
       ? window.DanaiwaStamina.challengeLeft() : 0;
   }
 
+  /* 是否已付费解锁「今日无限畅玩」——挑战次数用完也只是不再扣，仍可无限玩 */
+  function chalUnlimited() {
+    return !!(window.DanaiwaStamina && window.DanaiwaStamina.challengeUnlimited
+      && window.DanaiwaStamina.challengeUnlimited());
+  }
+
   /* 按钮要么是「图标 + .lbl」，要么是纯文字；统一处理 */
   function setBtnText(btn, text) {
     if (!btn) return;
@@ -783,10 +789,16 @@
     if (restartBtn) {
       if (state.mode === 'challenge') {
         const left = chalLeft();
-        restartBtn.disabled = left <= 0;
-        setBtnText(restartBtn, left > 0
-          ? T('challenge.btn.again', '⏱ 再挑战（剩 {n}）', { n: left })
-          : T('challenge.btn.none', '今日挑战次数已用完'));
+        if (chalUnlimited()) {
+          /* 已付费：不限次数，永远可再挑战 */
+          restartBtn.disabled = false;
+          setBtnText(restartBtn, T('challenge.btn.againUnlimited', '⏱ 再挑战（无限）'));
+        } else {
+          restartBtn.disabled = left <= 0;
+          setBtnText(restartBtn, left > 0
+            ? T('challenge.btn.again', '⏱ 再挑战（剩 {n}）', { n: left })
+            : T('challenge.btn.none', '今日挑战次数已用完'));
+        }
       } else {
         restartBtn.disabled = false;
         setBtnText(restartBtn, T('over.again', '再来一局'));
@@ -1016,7 +1028,9 @@
     }
     if (challengeLineEl) {
       if (challenge) {
-        challengeLineEl.textContent = T('over.challenge.line', '今日剩余挑战次数 {n} / 5', { n: chalLeft() });
+        challengeLineEl.textContent = chalUnlimited()
+          ? T('over.challenge.lineUnlimited', '今日挑战次数：无限（已解锁畅玩）')
+          : T('over.challenge.line', '今日剩余挑战次数 {n} / 5', { n: chalLeft() });
         challengeLineEl.hidden = false;
       } else {
         challengeLineEl.hidden = true;
@@ -1818,15 +1832,21 @@
    *  限时挑战弹窗 & 语言切换按钮
    * ------------------------------------------------------- */
 
-  /* 弹窗里显示今日剩余次数；次数用完则「开始挑战」置灰并改提示 */
+  /* 弹窗里显示今日剩余次数；次数用完则「开始挑战」置灰并改提示。
+     已付费解锁今日无限畅玩时，显示「无限」并始终可开始。 */
   function paintChallengeModal() {
     const remain = document.getElementById('challengeRemain');
     const start  = document.getElementById('challengeStart');
     const left = chalLeft();
-    if (remain) remain.innerHTML = T('challenge.remain', '今日剩余挑战次数：<strong>{n} / 5</strong>', { n: left });
+    const unlimited = chalUnlimited();
+    if (remain) {
+      remain.innerHTML = unlimited
+        ? T('challenge.remainUnlimited', '今日挑战次数：<strong>无限</strong>（已解锁今日畅玩）')
+        : T('challenge.remain', '今日剩余挑战次数：<strong>{n} / 5</strong>', { n: left });
+    }
     if (start) {
-      start.disabled = left <= 0;
-      start.textContent = left > 0
+      start.disabled = !unlimited && left <= 0;
+      start.textContent = (unlimited || left > 0)
         ? T('challenge.start', '开始挑战')
         : T('challenge.exhausted', '今日挑战次数已用完，明天再来～');
     }
@@ -1875,7 +1895,9 @@
         : T('over.title', '游戏结束');
     }
     if (challengeLineEl && state.mode === 'challenge' && !challengeLineEl.hidden) {
-      challengeLineEl.textContent = T('over.challenge.line', '今日剩余挑战次数 {n} / 5', { n: chalLeft() });
+      challengeLineEl.textContent = chalUnlimited()
+        ? T('over.challenge.lineUnlimited', '今日挑战次数：无限（已解锁畅玩）')
+        : T('over.challenge.line', '今日剩余挑战次数 {n} / 5', { n: chalLeft() });
     }
     if (achModalEl && achModalEl.classList && achModalEl.classList.contains('show')) renderAchList();
     /* 排行榜：昵称默认值 + 打开中的榜单文案 */
@@ -2010,7 +2032,7 @@
                      render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore,
                      MAX_BONUS, REVIVE_STEP, RESTART_MIN_SCORE, gotoSponsor, syncRestartBtn,
                      registerCombo, unlockAchievement, computeRating, comboMult,
-                     startChallenge, challengeOver, restartCurrent, chalLeft, paintChallengeModal,
+                     startChallenge, challengeOver, restartCurrent, chalLeft, chalUnlimited, paintChallengeModal,
                      CHALLENGE_SECONDS, CHALLENGE_PER_DAY, T,
                      blurReady: () => !!blurImg };
 })();
