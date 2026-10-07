@@ -99,6 +99,11 @@
         state.unlimited = true;
         save();
         render();
+        /* 通知棋盘侧同步「无限」状态：挑战次数不再受限、不再扣除 */
+        if (window.__DNW__) {
+          if (window.__DNW__.syncRestartBtn) window.__DNW__.syncRestartBtn();
+          if (window.__DNW__.paintChallengeModal) window.__DNW__.paintChallengeModal();
+        }
         return true;
       }
     } catch (e) { /* 网络异常：保持原状态 */ }
@@ -128,9 +133,17 @@
     if (chal.date !== todayStr()) { chal = { date: todayStr(), left: DAILY_CHAL }; saveChal(); }
   }
   function challengeLeft() { chalEnsureToday(); return chal.left; }
-  function challengeCanStart() { chalEnsureToday(); return chal.left > 0; }
+
+  /* 已付费解锁「今日无限畅玩」→ 挑战次数不再受限，也不消耗当天次数 */
+  function challengeUnlimited() { return isUnlimited(); }
+
+  function challengeCanStart() {
+    chalEnsureToday();
+    return isUnlimited() || chal.left > 0;
+  }
   function challengeConsume() {
     chalEnsureToday();
+    if (isUnlimited()) return chal.left;      // 无限畅玩：不扣次数
     if (chal.left > 0) { chal.left--; saveChal(); }
     return chal.left;
   }
@@ -239,6 +252,7 @@
     challengeLeft: challengeLeft,
     challengeCanStart: challengeCanStart,
     challengeConsume: challengeConsume,
+    challengeUnlimited: challengeUnlimited,
     DAILY_CHAL: DAILY_CHAL
   };
 
