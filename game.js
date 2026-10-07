@@ -41,6 +41,11 @@
   const RESTART_MIN_SCORE = 4000;
   const RESTART_HINT = '达到 ' + RESTART_MIN_SCORE + ' 分才能重开';
 
+  /* 「限时挑战」：60 秒倒计时冲分，每天 5 次（次数在 stamina.js 里按日重置）。
+     挑战模式独立于体力：越线不判负，时间到即结算。 */
+  const CHALLENGE_SECONDS = 60;
+  const CHALLENGE_PER_DAY = 5;
+
   /* 「连击」：窗口内每发生一次合成，连击数 +1，得分按倍率结算。
      倍率随连击线性增长，封顶 ×2 —— 让连续合成更上头，但不至于爆炸。 */
   const COMBO_WINDOW = 1.5;   // 连击窗口（秒）：超过这个时间没再合成，连击清零
@@ -127,6 +132,12 @@
   const reviveBadge    = document.getElementById('reviveBadge');
   const reviveCountEl  = document.getElementById('reviveCount');
 
+  /* 挑战模式 / 结算标题 的 DOM（元素缺失时一并兜底） */
+  const overTitleEl     = document.getElementById('overTitle');
+  const challengeHudEl  = document.getElementById('challengeHud');
+  const challengeTimeEl = document.getElementById('challengeTime');
+  const challengeLineEl = document.getElementById('challengeLine');
+
   /* 连击徽章 / 结算评级 / 成就提示 的 DOM 句柄（元素缺失时一律兜底跳过，不报错） */
   const comboEl      = document.getElementById('comboBadge');
   const comboNumEl   = document.getElementById('comboNum');
@@ -147,6 +158,21 @@
 
   const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
   const rand  = (a, b) => a + Math.random() * (b - a);
+
+  /* —— 国际化取词 ——
+     浏览器里由 i18n.js 提供 window.I18N；node 测试沙箱里没有，
+     就回退到调用处传入的中文 fallback，保证测试 / 离线场景都不炸。 */
+  function T(key, fallback, params) {
+    let s = null;
+    if (typeof window !== 'undefined' && window.I18N && window.I18N.t) {
+      s = window.I18N.t(key, params);
+    }
+    if (s == null) s = (fallback != null ? fallback : key);
+    if (params) {
+      for (const k in params) s = String(s).split('{' + k + '}').join(String(params[k]));
+    }
+    return s;
+  }
 
   /* 「下一个」是否允许和当前这颗相同。
      允许的话有约 22% 概率两边显示同一张图，看起来像“下一个显示的是当前这个”，
@@ -281,7 +307,9 @@
     shake: 0,          // 屏幕震动剩余强度（px），仅影响绘制偏移，不改物理/坐标
     combo: 0,          // 当前连击数（窗口内连续合成）
     comboTimer: 0,     // 连击窗口剩余时间（秒），归零则连击清零
-    comboMax: 0        // 本局最高连击数（用于成就 / 结算展示）
+    comboMax: 0,       // 本局最高连击数（用于成就 / 结算展示）
+    mode: 'classic',   // 'classic' | 'challenge'
+    timeLeft: 0        // 挑战模式剩余秒数（经典模式恒为 0）
   };
 
   /* ---------------------------------------------------------
@@ -597,7 +625,7 @@
         state.flash = 1.4;                    // 比普通合成更亮的全屏闪
         state.freeze = FREEZE_MS / 1000;      // 定格一下，让这一下有重量
         state.shake = Math.max(state.shake, 11);   // 神奶蛙炸场：来一下屏幕震动
-        state.floats.push({ x: mx, y: my - 74, text: '两个神奶蛙 💥', life: 1.6 });
+        state.floats.push({ x: mx, y: my - 74, text: T('fx.twin', '两个神奶蛙 💥'), life: 1.6 });
         state.floats.push({ x: mx, y: my - 16, text: '+' + MAX_BONUS, life: 2.2, big: true });
         if (MAX_MERGE_GIVES_REVIVE) {
           state.revives++;
@@ -690,7 +718,7 @@
     }
     if (!got) return;
     paintRevives(true);
-    state.floats.push({ x: W / 2, y: 210, text: '+1 复活币', life: 1.4, big: true });
+    state.floats.push({ x: W / 2, y: 210, text: T('fx.revive', '+1 复活币'), life: 1.4, big: true });
     Sound.merge(6);
   }
 
@@ -719,14 +747,51 @@
 
   /* 「重开」按钮的门槛状态：分数 < 4000 时置灰禁用并给出提示。
      得分每次变化（加分、复活扣减、结算）都要同步一次。 */
+  /* 今日还剩几次挑战（挑战次数由 stamina.js 按日重置） */
+  function chalLeft() {
+    return (window.DanaiwaStamina && window.DanaiwaStamina.challengeLeft)
+      ? window.DanaiwaStamina.challengeLeft() : 0;
+  }
+
+  /* 按钮要么是「图标 + .lbl」，要么是纯文字；统一处理 */
+  function setBtnText(btn, text) {
+    if (!btn) return;
+    const lbl = btn.querySelector ? btn.querySelector('.lbl') : null;
+    if (lbl) lbl.textContent = text; else btn.textContent = text;
+  }
+
+  /* 同步两个「重开 / 再来一局」按钮：
+       - 经典模式：侧栏「重开」仍受 4000 分门槛限制（旧行为）；
+       - 挑战模式：不再看分数，改看当日挑战次数，结算页按钮变成「再挑战（剩 N）」。
+     分数每次变化 / 结算 / 切换语言都要调一次。 */
   function syncRestartBtn() {
-    if (!resetBtn) return;
-    const ok = state.score >= RESTART_MIN_SCORE;
-    resetBtn.disabled = !ok;
-    resetBtn.setAttribute('aria-disabled', String(!ok));
-    resetBtn.title = ok ? '重新开始' : RESTART_HINT;
-    const lbl = resetBtn.querySelector('.lbl');
-    if (lbl) lbl.textContent = ok ? '重开' : RESTART_HINT;
+    if (resetBtn) {
+      if (state.mode === 'challenge') {
+        resetBtn.disabled = false;
+        resetBtn.setAttribute('aria-disabled', 'false');
+        resetBtn.title = T('btn.reset.title', '重新开始');
+        setBtnText(resetBtn, T('btn.reset', '重开'));
+      } else {
+        const ok = state.score >= RESTART_MIN_SCORE;
+        const hint = T('btn.reset.hint', RESTART_HINT);
+        resetBtn.disabled = !ok;
+        resetBtn.setAttribute('aria-disabled', String(!ok));
+        resetBtn.title = ok ? T('btn.reset.title', '重新开始') : hint;
+        setBtnText(resetBtn, ok ? T('btn.reset', '重开') : hint);
+      }
+    }
+    if (restartBtn) {
+      if (state.mode === 'challenge') {
+        const left = chalLeft();
+        restartBtn.disabled = left <= 0;
+        setBtnText(restartBtn, left > 0
+          ? T('challenge.btn.again', '⏱ 再挑战（剩 {n}）', { n: left })
+          : T('challenge.btn.none', '今日挑战次数已用完'));
+      } else {
+        restartBtn.disabled = false;
+        setBtnText(restartBtn, T('over.again', '再来一局'));
+      }
+    }
   }
 
   function addScore(n, x, y, text) {
@@ -761,16 +826,31 @@
    *  成就系统（持久化到 localStorage，跨局保留）
    * ------------------------------------------------------- */
 
+  /* 成就定义：名称 / 描述不在源码里写死，改由 i18n 词典按 id 取
+     （ach.<id>.name / ach.<id>.desc），切换语言时列表即时刷新。 */
   const ACHIEVEMENTS = [
-    { id: 'first_game', icon: '🎮', name: '初出茅庐', desc: '完成第一局游戏' },
-    { id: 'make_god',   icon: '🍉', name: '神奶蛙',   desc: '合成出神奶蛙（最大的那只）' },
-    { id: 'twin_god',   icon: '💥', name: '双蛙齐炸', desc: '让两只神奶蛙撞在一起' },
-    { id: 'score1k',    icon: '⭐', name: '千分快乐', desc: '单局得分达到 1000' },
-    { id: 'score5k',    icon: '🌟', name: '五千克星', desc: '单局得分达到 5000' },
-    { id: 'combo10',    icon: '🔥', name: '连击大师', desc: '单局达成 10 连击' },
-    { id: 'revive1',    icon: '🪙', name: '起死回生', desc: '使用一次复活币' },
-    { id: 'record',     icon: '🏆', name: '破纪录',   desc: '刷新你的最高分' }
+    { id: 'first_game', icon: '🎮' },
+    { id: 'make_god',   icon: '🍉' },
+    { id: 'twin_god',   icon: '💥' },
+    { id: 'score1k',    icon: '⭐' },
+    { id: 'score5k',    icon: '🌟' },
+    { id: 'combo10',    icon: '🔥' },
+    { id: 'revive1',    icon: '🪙' },
+    { id: 'record',     icon: '🏆' }
   ];
+
+  /* 中文兜底（node 测试沙箱 / I18N 缺失时用） */
+  const ACH_NAME = {
+    first_game: '初出茅庐', make_god: '神奶蛙', twin_god: '双蛙齐炸', score1k: '千分快乐',
+    score5k: '五千克星', combo10: '连击大师', revive1: '起死回生', record: '破纪录'
+  };
+  const ACH_DESC = {
+    first_game: '完成第一局游戏', make_god: '合成出神奶蛙（最大的那只）', twin_god: '让两只神奶蛙撞在一起',
+    score1k: '单局得分达到 1000', score5k: '单局得分达到 5000', combo10: '单局达成 10 连击',
+    revive1: '使用一次复活币', record: '刷新你的最高分'
+  };
+  function achName(id) { return T('ach.' + id + '.name', ACH_NAME[id] || id); }
+  function achDesc(id) { return T('ach.' + id + '.desc', ACH_DESC[id] || ''); }
 
   function loadAch() {
     try { return JSON.parse(localStorage.getItem(ACH_KEY) || '{}') || {}; }
@@ -790,7 +870,7 @@
   function showAchToast(def) {
     if (!achToastEl || !achToastName) return;
     if (achToastIco) achToastIco.textContent = def.icon;
-    achToastName.textContent = def.name;
+    achToastName.textContent = achName(def.id);
     achToastEl.hidden = false;
     achToastEl.classList.remove('show');
     void achToastEl.offsetWidth;
@@ -814,10 +894,10 @@
       row.className = 'ach-row' + (got ? ' got' : '');
       const ico = document.createElement('span');  ico.className = 'ach-ico';     ico.textContent = a.icon;
       const meta = document.createElement('span'); meta.className = 'ach-meta';
-      const nm = document.createElement('span');   nm.className = 'ach-name';     nm.textContent = a.name;
-      const ds = document.createElement('span');   ds.className = 'ach-desc';     ds.textContent = a.desc;
+      const nm = document.createElement('span');   nm.className = 'ach-name';     nm.textContent = achName(a.id);
+      const ds = document.createElement('span');   ds.className = 'ach-desc';     ds.textContent = achDesc(a.id);
       meta.appendChild(nm); meta.appendChild(ds);
-      const st = document.createElement('span');   st.className = 'ach-state';    st.textContent = got ? '已达成' : '未达成';
+      const st = document.createElement('span');   st.className = 'ach-state';    st.textContent = got ? T('ach.got', '已达成') : T('ach.not', '未达成');
       row.appendChild(ico); row.appendChild(meta); row.appendChild(st);
       achListEl.appendChild(row);
     });
@@ -907,7 +987,8 @@
            被弹起来、正在飞过线的不算，免得误判 */
         if (b.vx * b.vx + b.vy * b.vy < REST_SPEED2) {
           b.overTime += dt;
-          if (b.overTime > OVER_LIMIT) { gameOver(); return; }
+          /* 挑战模式越线不判负（纯冲分，时间到才结算），所以不触发 gameOver */
+          if (b.overTime > OVER_LIMIT && state.mode !== 'challenge') { gameOver(); return; }
         } else {
           b.overTime = Math.max(0, b.overTime - dt * 2);
         }
@@ -926,9 +1007,25 @@
     if (overPanelEl) overPanelEl.hidden = false;
     if (overlayEl) overlayEl.classList.add('show');
     hideCombo();
+    hideChallengeHud();
+    const challenge = state.mode === 'challenge';
+    if (overTitleEl) {
+      overTitleEl.textContent = challenge
+        ? T('over.title.challenge', '挑战结束')
+        : T('over.title', '游戏结束');
+    }
+    if (challengeLineEl) {
+      if (challenge) {
+        challengeLineEl.textContent = T('over.challenge.line', '今日剩余挑战次数 {n} / 5', { n: chalLeft() });
+        challengeLineEl.hidden = false;
+      } else {
+        challengeLineEl.hidden = true;
+      }
+    }
     computeRating();
     unlockAchievement('first_game');
     if (state.bestBeaten) unlockAchievement('record');
+    syncRestartBtn();   // 挑战模式下把「再来一局」改成「再挑战（剩 N）」
     /* 交给排行榜模块（没加载也不影响） */
     if (window.DanaiwaBoard && window.DanaiwaBoard.onGameOver) {
       window.DanaiwaBoard.onGameOver(state.score);
@@ -938,18 +1035,19 @@
   /* 按本局得分给 S/A/B/C 评级 + 一句趣味文案（展示在结算页） */
   function computeRating() {
     const s = state.score;
-    let grade = 'C', txt = '继续加油', cls = 'grade-c';
-    if (s >= 6000)      { grade = 'S'; txt = '奶龙本龙！';   cls = 'grade-s'; }
-    else if (s >= 3500) { grade = 'A'; txt = '合成大师';     cls = 'grade-a'; }
-    else if (s >= 1500) { grade = 'B'; txt = '有点东西';     cls = 'grade-b'; }
+    let grade = 'C', key = 'rating.c', cls = 'grade-c';
+    if (s >= 6000)      { grade = 'S'; key = 'rating.s'; cls = 'grade-s'; }
+    else if (s >= 3500) { grade = 'A'; key = 'rating.a'; cls = 'grade-a'; }
+    else if (s >= 1500) { grade = 'B'; key = 'rating.b'; cls = 'grade-b'; }
+    const FB = { 'rating.s': '奶龙本龙！', 'rating.a': '合成大师', 'rating.b': '有点东西', 'rating.c': '继续加油' };
     if (ratingEl)   { ratingEl.textContent = grade; ratingEl.className = 'rating ' + cls; }
-    if (ratingTxtEl) ratingTxtEl.textContent = txt;
+    if (ratingTxtEl) ratingTxtEl.textContent = T(key, FB[key]);
   }
 
   /* 越线那一屏：有复活币就先问一句 */
   function askRevive() {
     if (reviveScoreEl) reviveScoreEl.textContent = state.score;
-    if (reviveLeftEl) reviveLeftEl.textContent = '还剩 ' + state.revives + ' 枚';
+    if (reviveLeftEl) reviveLeftEl.textContent = T('revive.left', '还剩 {n} 枚', { n: state.revives });
     if (revivePromptEl) revivePromptEl.hidden = false;
     if (overPanelEl) overPanelEl.hidden = true;
     if (overlayEl) overlayEl.classList.add('show');
@@ -1002,21 +1100,9 @@
     return true;
   }
 
-  function reset() {
-    /* —— 体力值校验：每天 1 点，用完需打赏解锁今日无限畅玩 —— */
-    if (window.DanaiwaStamina) {
-      if (!window.DanaiwaStamina.canStart()) {
-        window.DanaiwaStamina.blocked();    // 体力已用完：弹赞助弹窗，提示打赏
-        state.locked = true;                // 锁死棋盘：关掉弹窗也投不了（防退出重进白嫖）
-        /* 不 return：继续把棋盘初始化好以便渲染，但 locked 会阻止投放 */
-      } else {
-        window.DanaiwaStamina.consume();     // 扣 1 点体力（已解锁则不扣）
-        state.locked = false;
-      }
-    } else {
-      state.locked = false;
-    }
-
+  /* 重置棋盘到「可以开打」的状态（经典 / 挑战共用）。
+     不含体力或挑战次数的校验 —— 那些由 reset() / startChallenge() 各自处理。 */
+  function initBoard() {
     state.balls.length = 0;
     state.particles.length = 0;
     state.floats.length = 0;
@@ -1042,6 +1128,7 @@
     if (overlayEl) overlayEl.classList.remove('show');
     if (revivePromptEl) revivePromptEl.hidden = true;
     if (overPanelEl) overPanelEl.hidden = false;
+    if (challengeLineEl) challengeLineEl.hidden = true;
     paintRevives(false);
     scoreEl.textContent = '0';
     bestEl.textContent = state.best;
@@ -1051,6 +1138,86 @@
     paintAchCount();
     drawNext();
     Sound.ensure();
+  }
+
+  /* 经典模式：每天 1 点体力，用完需打赏解锁今日无限畅玩 */
+  function reset() {
+    state.mode = 'classic';
+    state.timeLeft = 0;
+    hideChallengeHud();
+    if (window.DanaiwaStamina) {
+      if (!window.DanaiwaStamina.canStart()) {
+        window.DanaiwaStamina.blocked();    // 体力已用完：弹赞助弹窗，提示打赏
+        state.locked = true;                // 锁死棋盘：关掉弹窗也投不了（防退出重进白嫖）
+        /* 不 return：继续把棋盘初始化好以便渲染，但 locked 会阻止投放 */
+      } else {
+        window.DanaiwaStamina.consume();     // 扣 1 点体力（已解锁则不扣）
+        state.locked = false;
+      }
+    } else {
+      state.locked = false;
+    }
+    initBoard();
+  }
+
+  /* ---------------------------------------------------------
+   *  限时挑战模式（60 秒 / 每天 5 次，独立于体力）
+   * ------------------------------------------------------- */
+
+  function showChallengeHud() {
+    if (challengeHudEl) challengeHudEl.hidden = false;
+    paintChallengeHud();
+  }
+
+  function hideChallengeHud() {
+    if (!challengeHudEl) return;
+    challengeHudEl.hidden = true;
+    challengeHudEl.classList.remove('low');
+  }
+
+  /* 倒计时 HUD：秒数 + 最后 10 秒变红（.low） */
+  function paintChallengeHud() {
+    if (!challengeTimeEl) return;
+    const s = Math.max(0, Math.ceil(state.timeLeft));
+    challengeTimeEl.textContent = s;
+    if (challengeHudEl) {
+      if (s <= 10) challengeHudEl.classList.add('low');
+      else challengeHudEl.classList.remove('low');
+    }
+  }
+
+  /* 开一局挑战：消耗当天 1 次机会（独立于体力），60 秒倒计时。
+     返回 false 表示次数用完、没开成。 */
+  function startChallenge() {
+    if (window.DanaiwaStamina && window.DanaiwaStamina.challengeCanStart) {
+      if (!window.DanaiwaStamina.challengeCanStart()) {
+        paintChallengeModal();
+        return false;
+      }
+      window.DanaiwaStamina.challengeConsume();
+    }
+    state.mode = 'challenge';
+    state.timeLeft = CHALLENGE_SECONDS;
+    state.locked = false;      // 挑战不受体力锁影响（体力用完也能玩挑战）
+    initBoard();
+    showChallengeHud();
+    return true;
+  }
+
+  /* 时间到：直接结算（挑战里越线不判负，所以没有 revive 询问屏） */
+  function challengeOver() {
+    state.over = true;
+    hideChallengeHud();
+    if (finalScoreEl) finalScoreEl.textContent = state.score;
+    if (finalBestEl) finalBestEl.textContent = state.best;
+    Sound.over();
+    settle();
+  }
+
+  /* 按当前模式重开一局（结算页「再来一局」/ R 键用） */
+  function restartCurrent() {
+    if (state.mode === 'challenge') startChallenge();
+    else reset();
   }
 
   /* ---------------------------------------------------------
@@ -1367,7 +1534,7 @@
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(150,110,80,.85)';
-    ctx.fillText('下一个', x - r - 10, y);
+    ctx.fillText(T('label.next', '下一个'), x - r - 10, y);
     ctx.restore();
 
     drawFruit(ctx, x, y, r, tier, 0, 1);
@@ -1473,6 +1640,13 @@
     }
 
     if (state.over) return;          // 结束后冻结棋盘（粒子特效仍在 render 里继续）
+
+    /* 挑战模式倒计时：时间一到立刻结算 */
+    if (state.mode === 'challenge' && state.timeLeft > 0) {
+      state.timeLeft = Math.max(0, state.timeLeft - dt);
+      paintChallengeHud();
+      if (state.timeLeft <= 0) { challengeOver(); return; }
+    }
 
     if (!state.ready) {
       state.cooldown -= dt;
@@ -1592,7 +1766,7 @@
     const ico = soundBtn.querySelector('.ico');
     const lbl = soundBtn.querySelector('.lbl');
     if (ico) ico.textContent = Sound.muted ? '🔇' : '🔊';
-    if (lbl) lbl.textContent = Sound.muted ? '音效关' : '音效开';
+    if (lbl) lbl.textContent = Sound.muted ? T('btn.sound.off', '音效关') : T('btn.sound.on', '音效开');
     soundBtn.setAttribute('aria-pressed', String(!Sound.muted));
   }
 
@@ -1607,20 +1781,21 @@
      disabled 时浏览器不会派发 click，这里再判一次是为了兜住
      「分数被复活/结算改回去」这类边界，也方便将来改成非禁用式提示。 */
   resetBtn.addEventListener('click', () => {
+    if (state.mode === 'challenge') { startChallenge(); return; }   // 挑战模式重开 = 再开一局挑战
     if (state.score < RESTART_MIN_SCORE) {
-      if (window.console) console.info('[danaiwa] ' + RESTART_HINT + '（当前 ' + state.score + ' 分）');
+      if (window.console) console.info('[danaiwa] ' + T('btn.reset.hint', RESTART_HINT) + '（当前 ' + state.score + ' 分）');
       syncRestartBtn();
       return;
     }
     reset();
   });
 
-  /* 「再来一局」：重开一局。体力校验在 reset() 内部完成（体力用完才弹赞助），
-     所以这里不再自动跳到赞助区 —— 游戏结束应当停在本局结算页（卡住不动）。
-     结算页里另有独立的「🧋 赏作者一杯奶茶」按钮负责引导打赏。 */
+  /* 「再来一局」：按当前模式重开一局。
+     经典模式体力校验在 reset() 内部；挑战模式再消耗一次挑战机会（startChallenge）。
+     结算页另有独立的「🧋 赏作者一杯奶茶」按钮负责引导打赏。 */
   restartBtn.addEventListener('click', () => {
     if (overlayEl) overlayEl.classList.remove('show');
-    reset();
+    restartCurrent();
   });
 
   /* 成就弹窗：点「成就」按钮打开列表；关闭按钮 / 点遮罩 / Esc 都能关。 */
@@ -1637,6 +1812,83 @@
     if (achModalEl) achModalEl.addEventListener('click', (e) => { if (e.target === achModalEl) closeAch(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAch(); });
     paintAchCount();
+  }
+
+  /* ---------------------------------------------------------
+   *  限时挑战弹窗 & 语言切换按钮
+   * ------------------------------------------------------- */
+
+  /* 弹窗里显示今日剩余次数；次数用完则「开始挑战」置灰并改提示 */
+  function paintChallengeModal() {
+    const remain = document.getElementById('challengeRemain');
+    const start  = document.getElementById('challengeStart');
+    const left = chalLeft();
+    if (remain) remain.innerHTML = T('challenge.remain', '今日剩余挑战次数：<strong>{n} / 5</strong>', { n: left });
+    if (start) {
+      start.disabled = left <= 0;
+      start.textContent = left > 0
+        ? T('challenge.start', '开始挑战')
+        : T('challenge.exhausted', '今日挑战次数已用完，明天再来～');
+    }
+  }
+
+  function bindChallenge() {
+    const cBtn   = document.getElementById('challengeBtn');
+    const cModal = document.getElementById('challengeModal');
+    const cClose = document.getElementById('challengeClose');
+    const cStart = document.getElementById('challengeStart');
+
+    const openC  = () => {
+      paintChallengeModal();
+      if (cModal) { cModal.classList.add('show'); cModal.setAttribute('aria-hidden', 'false'); }
+    };
+    const closeC = () => {
+      if (cModal) { cModal.classList.remove('show'); cModal.setAttribute('aria-hidden', 'true'); }
+    };
+
+    if (cBtn)   cBtn.addEventListener('click', openC);
+    if (cClose) cClose.addEventListener('click', closeC);
+    if (cStart) cStart.addEventListener('click', () => { if (startChallenge()) closeC(); });
+    if (cModal) cModal.addEventListener('click', (e) => { if (e.target === cModal) closeC(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeC(); });
+    paintChallengeModal();
+  }
+
+  /* 语言切换按钮：中文 ⇄ English */
+  function bindLang() {
+    const lb = document.getElementById('langBtn');
+    if (!lb) return;
+    lb.addEventListener('click', () => {
+      if (!window.I18N) return;
+      window.I18N.set(window.I18N.get() === 'zh' ? 'en' : 'zh');
+    });
+  }
+
+  /* 切换语言后，重建所有「非静态」的动态文案 */
+  function refreshDynamicText() {
+    paintSoundBtn();
+    syncRestartBtn();
+    paintChallengeModal();
+    if (overTitleEl) {
+      overTitleEl.textContent = state.mode === 'challenge'
+        ? T('over.title.challenge', '挑战结束')
+        : T('over.title', '游戏结束');
+    }
+    if (challengeLineEl && state.mode === 'challenge' && !challengeLineEl.hidden) {
+      challengeLineEl.textContent = T('over.challenge.line', '今日剩余挑战次数 {n} / 5', { n: chalLeft() });
+    }
+    if (achModalEl && achModalEl.classList && achModalEl.classList.contains('show')) renderAchList();
+    /* 排行榜：昵称默认值 + 打开中的榜单文案 */
+    if (window.DanaiwaBoard) {
+      if (window.DanaiwaBoard.hasName && !window.DanaiwaBoard.hasName()) {
+        const nl = document.getElementById('myNameLabel');
+        if (nl) nl.textContent = T('lb.defaultUser', '默认用户');
+      }
+      const bm = document.getElementById('boardModal');
+      if (bm && bm.classList.contains('show') && window.DanaiwaBoard.refresh) {
+        try { window.DanaiwaBoard.refresh(null).catch(function () {}); } catch (e) { /* ignore */ }
+      }
+    }
   }
 
   /* ---------------------------------------------------------
@@ -1730,6 +1982,11 @@
 
     paintSoundBtn();
     bindAch();
+    bindChallenge();
+    bindLang();
+
+    /* 切换语言后刷新动态文案（按钮 label / 弹窗 / 结算标题 / 榜单等） */
+    if (window.I18N && window.I18N.onChange) window.I18N.onChange(refreshDynamicText);
 
     /* 越线那一屏的两个按钮 */
     if (reviveBtn) reviveBtn.addEventListener('click', revive);
@@ -1749,9 +2006,11 @@
   }
 
   /* 调试句柄（控制台可用）：__DNW__.state / .reset() / .drop() / .FRUITS / .render() */
-  window.__DNW__ = { state, reset, revive, settle, gameOver, tryDrop, stepPhysics, update, FRUITS,
+  window.__DNW__ = { state, reset, initBoard, revive, settle, gameOver, tryDrop, stepPhysics, update, FRUITS,
                      render, resizeCanvas, shapeOf, makeBall, paintRevives, addScore,
                      MAX_BONUS, REVIVE_STEP, RESTART_MIN_SCORE, gotoSponsor, syncRestartBtn,
                      registerCombo, unlockAchievement, computeRating, comboMult,
+                     startChallenge, challengeOver, restartCurrent, chalLeft, paintChallengeModal,
+                     CHALLENGE_SECONDS, CHALLENGE_PER_DAY, T,
                      blurReady: () => !!blurImg };
 })();
